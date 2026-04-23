@@ -1,0 +1,23 @@
+{
+  "version": "3.0",
+  "model_type": "ensemble_voting",
+  "label_mapping": {
+    "Low Risk": 0,
+    "Moderate Risk": 1,
+    "High Risk ADHD": 2
+  },
+  "feature_names": [
+    "focus",
+    "hyperactivity",
+    "completion"
+  ],
+  "algorithms": [
+    "RandomForest",
+    "GradientBoosting",
+    "LogisticRegression"
+  ],
+  "text_weight": 0.6,
+  "behavioral_weight": 0.4,
+  "test_accuracy": 0.9375,
+  "test_f1": 0.9366
+}

@@ -1,0 +1,26 @@
+# Large Datasets
+*.csv
+*.csv2
+*.png
+
+# Frontend
+frontend/
+node_modules/
+package-lock.json
+package.json
+
+# Environment and Secrets
+.env
+.venv
+fasttext_env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.vscode/
+.git/
+
+# Backend temporary files
+backend/__pycache__/
+backend/.env

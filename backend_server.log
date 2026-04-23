@@ -1,0 +1,90 @@
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+WARNING: HF_TOKEN missing in .env file.
+IKS Recommendations will use STATIC FALLBACK mode.
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+==================================================
+ADHD ASSESSMENT SYSTEM - STARTUP
+==================================================
+Models loaded: False
+LLM available: False
+Fallback mode: True
+Warnings:
+ - Model artifact is a Git LFS pointer and not downloaded: behavioral_model (C:\Users\Aayush\Downloads\ADHD.Detection-main\ADHD.Detection-main\backend\model\adhd_model.pkl).
+ - TensorFlow is unavailable; deep learning model disabled.
+==================================================
+
+INFO:     127.0.0.1:59276 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59276 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59276 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58750 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58406 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58406 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57901 - "OPTIONS /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64811 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51256 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:51256 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59659 - "OPTIONS /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54422 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56144 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56144 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49701 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64907 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64239 - "OPTIONS /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64239 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55433 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55433 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60907 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60907 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60907 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53991 - "OPTIONS /recommend HTTP/1.1" 200 OK
+Using STATIC FALLBACK for Mild severity (AI currently unavailable).
+INFO:     127.0.0.1:53991 - "POST /recommend HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59718 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63247 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56687 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56687 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64197 - "OPTIONS /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59783 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56713 - "OPTIONS /recommend HTTP/1.1" 200 OK
+Using STATIC FALLBACK for Moderate severity (AI currently unavailable).
+INFO:     127.0.0.1:56713 - "POST /recommend HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62136 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53224 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50334 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50334 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55190 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55190 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55190 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55190 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55190 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55190 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55190 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53560 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53560 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60392 - "OPTIONS /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50460 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62786 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:62786 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59838 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59838 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56151 - "OPTIONS /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52014 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53243 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50188 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58059 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58059 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55605 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:55605 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:60931 - "OPTIONS /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52618 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53953 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:53953 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57107 - "OPTIONS /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:57107 - "POST /predict HTTP/1.1" 200 OK
+INFO:     127.0.0.1:49882 - "OPTIONS /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61258 - "POST /copilot/brief HTTP/1.1" 200 OK
+INFO:     127.0.0.1:50700 - "OPTIONS /recommend HTTP/1.1" 200 OK
+Using STATIC FALLBACK for Moderate severity (AI currently unavailable).
+INFO:     127.0.0.1:50700 - "POST /recommend HTTP/1.1" 200 OK

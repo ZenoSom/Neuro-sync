@@ -1,0 +1,34 @@
+# ================================================
+# Python dependencies for the ADHD Detection project
+# Install with: pip install -r requirements.txt
+# ================================================
+
+# Reddit scraping
+praw>=7.7.0
+
+# Data handling
+pandas>=2.0.0
+numpy>=1.24.0
+openpyxl>=3.1.0          # for .xlsx output in adhd1.py
+
+# NLP & Text Processing
+nltk>=3.8.0
+gensim>=4.3.0             # FastText embeddings
+
+# Machine Learning (classical)
+scikit-learn>=1.3.0
+
+# Deep Learning
+tensorflow>=2.13.0        # includes keras
+
+# Transformer models (Mental_bert.py)
+transformers>=4.35.0
+huggingface-hub>=0.19.0
+
+# Visualisation
+matplotlib>=3.7.0
+seaborn>=0.12.0
+
+# Utilities
+tqdm>=4.65.0
+python-dotenv>=1.0.0      # load .env credentials in ADHD.py / non-adhd.py

@@ -1,0 +1,1 @@
+{"model_name": "CNN + LSTM Hybrid", "accuracy": 0.8909512761020881, "max_seq_len": 100, "type": "deep_learning"}

@@ -1,0 +1,8 @@
+[nltk_data] Error loading stopwords: <urlopen error [Errno 11001]
+[nltk_data]     getaddrinfo failed>
+[nltk_data] Error loading wordnet: <urlopen error [Errno 11001]
+[nltk_data]     getaddrinfo failed>
+INFO:     Started server process [18084]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
