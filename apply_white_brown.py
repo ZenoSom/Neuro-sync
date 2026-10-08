@@ -50,5 +50,5 @@ def replace_colors(directory):
                     with open(filepath, 'w', encoding='utf-8') as f:
                         f.write(content)
 
-replace_colors(r"C:\Users\Kartik\Desktop\ADHD.Detection-main (2)\ADHD.Detection-main\ADHD.Detection-main\frontend\src")
+replace_colors(r"C:\Users\Nitin\Downloads\Adhd-september\ADHD.Detection-main\ADHD.Detection-main\frontend\src")
 print("Fonts and White/Brown layout applied.")

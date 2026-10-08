@@ -39,6 +39,13 @@ wheels/
 MANIFEST
 .venv
 venv/
+venv*/
+backend/venv*/
+*.log
+*.err.log
+*.txt
+!README.md
+patch.cjs
 ENV/
 env.bak/
 venv.bak/

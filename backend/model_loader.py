@@ -11,6 +11,8 @@ _model = None
 _feature_names = None
 _text_model = None
 _vectorizer = None
+_scaler = None
+_metadata = None
 _dl_model = None
 _tokenizer = None
 _warnings = set()
@@ -53,8 +55,12 @@ def get_loader_warnings():
 
 def get_model_artifact_status():
     artifacts = {
-        "behavioral_model": os.path.join(MODEL_DIR, "adhd_model.pkl"),
+        "behavioral_model": os.path.join(MODEL_DIR, "adhd_behavioral_ensemble_v3.pkl"),
         "feature_names": os.path.join(MODEL_DIR, "feature_names.json"),
+        "scaler": os.path.join(MODEL_DIR, "adhd_scaler_v3.pkl"),
+        "metadata": os.path.join(MODEL_DIR, "adhd_metadata_v3.json"),
+        "text_model": os.path.join(MODEL_DIR, "adhd_text_ensemble_v3.pkl"),
+        "vectorizer": os.path.join(MODEL_DIR, "adhd_vectorizer_v3.pkl"),
         "dl_model": os.path.join(MODEL_DIR, "dl_model", "adhd_dl_model.h5"),
         "tokenizer": os.path.join(MODEL_DIR, "dl_model", "tokenizer.pkl"),
     }
@@ -76,9 +82,10 @@ def get_model_readiness():
     # Trigger lazy loading to validate runtime availability.
     behavioral_loaded = bool(get_model() is not None and get_feature_names())
     dl_loaded = bool(get_dl_model() is not None and get_tokenizer() is not None)
+    text_loaded = bool(get_text_model() is not None and get_vectorizer() is not None)
 
     warnings = get_loader_warnings()
-    models_loaded = behavioral_loaded or dl_loaded
+    models_loaded = behavioral_loaded or dl_loaded or text_loaded
 
     return {
         "models_loaded": models_loaded,
@@ -87,14 +94,18 @@ def get_model_readiness():
         "artifact_status": get_model_artifact_status(),
         "behavioral_loaded": behavioral_loaded,
         "dl_loaded": dl_loaded,
+        "text_loaded": text_loaded,
     }
 
 
+# ── Behavioral (structured) model ────────────────────────────────────
+
+
 def get_model():
-    """Returns the behavioral (structured) model."""
+    """Returns the behavioral (structured) ensemble model (v3)."""
     global _model
     if _model is None:
-        path = os.path.join(MODEL_DIR, "adhd_model.pkl")
+        path = os.path.join(MODEL_DIR, "adhd_behavioral_ensemble_v3.pkl")
         if _missing_or_pointer(path, "behavioral_model"):
             return None
         try:
@@ -125,11 +136,46 @@ def get_feature_names():
     return _feature_names
 
 
+def get_scaler():
+    """Returns the feature scaler (v3)."""
+    global _scaler
+    if _scaler is None:
+        path = os.path.join(MODEL_DIR, "adhd_scaler_v3.pkl")
+        if _missing_or_pointer(path, "scaler"):
+            return None
+        try:
+            _scaler = joblib.load(path)
+        except Exception as exc:
+            _add_warning(f"Failed to load scaler: {exc}")
+            _scaler = None
+    return _scaler
+
+
+def get_metadata():
+    """Returns the v3 model metadata dict."""
+    global _metadata
+    if _metadata is None:
+        path = os.path.join(MODEL_DIR, "adhd_metadata_v3.json")
+        if not os.path.exists(path):
+            _add_warning(f"Missing metadata file: {path}.")
+            return None
+        try:
+            with open(path, encoding="utf-8") as f:
+                _metadata = json.load(f)
+        except Exception as exc:
+            _add_warning(f"Failed to load metadata: {exc}")
+            _metadata = None
+    return _metadata
+
+
+# ── Text model (TF-IDF + ensemble) ──────────────────────────────────
+
+
 def get_text_model():
-    """Returns the best classical text model."""
+    """Returns the text ensemble model (v3)."""
     global _text_model
     if _text_model is None:
-        path = os.path.join(MODEL_DIR, "text_model", "adhd_classifier.pkl")
+        path = os.path.join(MODEL_DIR, "adhd_text_ensemble_v3.pkl")
         if _missing_or_pointer(path, "text_model"):
             return None
         try:
@@ -141,11 +187,11 @@ def get_text_model():
 
 
 def get_vectorizer():
-    """Returns the TF-IDF vectorizer for text prediction."""
+    """Returns the TF-IDF vectorizer (v3)."""
     global _vectorizer
     if _vectorizer is None:
-        path = os.path.join(MODEL_DIR, "text_model", "tfidf_vectorizer.pkl")
-        if _missing_or_pointer(path, "tfidf_vectorizer"):
+        path = os.path.join(MODEL_DIR, "adhd_vectorizer_v3.pkl")
+        if _missing_or_pointer(path, "vectorizer"):
             return None
         try:
             _vectorizer = joblib.load(path)
@@ -153,6 +199,9 @@ def get_vectorizer():
             _add_warning(f"Failed to load TF-IDF vectorizer: {exc}")
             _vectorizer = None
     return _vectorizer
+
+
+# ── Deep Learning model (CNN+LSTM) ──────────────────────────────────
 
 
 def get_dl_model():

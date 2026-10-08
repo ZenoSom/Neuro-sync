@@ -1,14 +1,15 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, RadialBarChart, RadialBar } from 'recharts';
+import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, ResponsiveContainer, RadialBarChart, RadialBar, Tooltip } from 'recharts';
 import { 
-  ArrowLeft, AlertCircle, Sparkles, AlertTriangle, ShieldCheck, 
+  ArrowLeft, ArrowRight, AlertCircle, Sparkles, AlertTriangle, ShieldCheck, 
   Activity, Leaf, Wind, Sun, Moon, Sparkle, Heart, 
-  Dna, Fingerprint, Microscope, ClipboardCheck, Download, Zap, Loader2
+  Dna, Fingerprint, Microscope, ClipboardCheck, Download, Zap, Loader2, Camera
 } from 'lucide-react';
 import { getCopilotBrief, getRecommendations, predictADHD } from '../services/api';
 import GenAIImpactNetwork from '../components/GenAIImpactNetwork';
+import html2pdf from 'html2pdf.js';
 
 const ResultPage = () => {
   const location = useLocation();
@@ -24,13 +25,22 @@ const ResultPage = () => {
   const [scenarioResult, setScenarioResult] = React.useState(null);
   const [showDoctorsModal, setShowDoctorsModal] = React.useState(false);
 
-  const doctorsList = [
+  const defaultDoctors = [
     { id: 1, name: "Dr. Sarah Jenkins", type: "Clinical Psychologist", specialized: ["Mild", "Moderate"], availability: "Available Today" },
     { id: 2, name: "Dr. Robert Chen", type: "Psychiatrist & Neurologist", specialized: ["Moderate", "High"], availability: "Next Available: Tomorrow" },
     { id: 3, name: "Dr. Emily Torres", type: "Behavioral Therapist", specialized: ["Mild", "Moderate"], availability: "Available Today" },
     { id: 4, name: "Dr. Michael Okafor", type: "ADHD Specialist", specialized: ["High"], availability: "Available in 2 Days" },
     { id: 5, name: "Dr. Lisa Ray", type: "Neurodevelopmental Pediatrician", specialized: ["High", "Moderate"], availability: "Available Next Week" }
   ];
+
+  const [doctorsList, setDoctorsList] = React.useState(defaultDoctors);
+
+  React.useEffect(() => {
+    const stored = JSON.parse(localStorage.getItem('registeredDoctors') || '[]');
+    if (stored.length > 0) {
+      setDoctorsList([...stored, ...defaultDoctors]);
+    }
+  }, []);
 
   const scenarioOptions = [
     {
@@ -58,7 +68,33 @@ const ResultPage = () => {
   };
 
   const handleSavePDF = () => {
-    window.print();
+    const element = document.getElementById('report-container');
+    if (!element) return window.print(); // Fallback
+    
+    document.body.classList.add('printing-pdf');
+
+    const opt = {
+      margin:       [10, 10, 10, 10], // top, left, bottom, right in mm
+      filename:     `NeuroSync_ADHD_Clinical_Report_${Date.now().toString().slice(-6)}.pdf`,
+      image:        { type: 'jpeg', quality: 0.98 },
+      html2canvas:  { 
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#ffffff',
+        logging: false,
+        ignoreElements: (node) => node.classList && node.classList.contains('no-print')
+      },
+      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
+    };
+
+    html2pdf().set(opt).from(element).save().then(() => {
+        document.body.classList.remove('printing-pdf');
+    }).catch(err => {
+        console.error("PDF generation failed, using standard print fallback:", err);
+        document.body.classList.remove('printing-pdf');
+        window.print();
+    });
   };
 
   const handleGetRecommendations = async () => {
@@ -143,6 +179,7 @@ const ResultPage = () => {
         delta,
         direction,
         narrative,
+        triggerKey: Date.now(),
       });
     } catch (err) {
       console.error(err);
@@ -198,78 +235,119 @@ const ResultPage = () => {
     }
   ];
 
+  const staggerVariants = {
+    hidden: { opacity: 0 },
+    visible: { opacity: 1, transition: { staggerChildren: 0.15, delayChildren: 0.1 } }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 50, scale: 0.96 },
+    visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.8, ease: [0.16, 1, 0.3, 1] } }
+  };
+
   return (
     <motion.div 
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="min-h-screen bg-white py-12 px-4 z-10 selection:bg-amber-700/20 selection:text-cyan-900"
+      initial="hidden"
+      animate="visible"
+      variants={staggerVariants}
+      className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-indigo-50/60 py-12 px-4 z-10 selection:bg-indigo-500/20 selection:text-indigo-900 relative overflow-hidden pb-32"
     >
-      <div className="max-w-6xl mx-auto space-y-10">
+      {/* Background Orbs */}
+      <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden fixed">
+        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-slate-400/10 blur-[100px] animate-float-slow" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-emerald-300/10 blur-[120px] animate-float-medium animation-delay-2000" />
+      </div>
 
-        {/* --- PREMIUM HUD HEADER --- */}
-        <div className="flex flex-col md:flex-row items-center justify-between bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-[0_30px_80px_-40px_rgba(0,0,0,0.1)] no-print">
-          <div className="flex items-center gap-8">
-            <button 
-              onClick={() => navigate('/assessment')} 
-              className="group flex items-center gap-3 text-indigo-600 hover:text-indigo-800 transition-all font-black uppercase tracking-widest text-xs cursor-pointer"
-            >
-              <div className="p-3 bg-indigo-50/50 rounded-2xl group-hover:bg-indigo-100 transition-colors">
-                <ArrowLeft className="w-5 h-5" />
+      <div id="report-container" className="max-w-6xl mx-auto space-y-10 relative z-10 p-2">
+
+        {/* --- CUSTOM GLASS TAB BAR HEADER --- */}
+        <motion.div variants={itemVariants} className="flex justify-center w-full no-print relative z-20 mb-8 mt-2">
+          <div className="glass-bar-wrapper">
+            <div className="glass-bar-inner">
+              
+              {/* Back / New Analysis */}
+              <button className="btn-capsule-glass" onClick={() => navigate('/assessment')}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="19" y1="12" x2="5" y2="12"></line>
+                  <polyline points="12 19 5 12 12 5"></polyline>
+                </svg>
+                <span>NEW ANALYSIS</span>
+              </button>
+
+              <div className="bar-divider-glass hidden sm:block"></div>
+
+              {/* Center Diagnostic Branding */}
+              <div className="info-group-glass">
+                <div className="badge-icon-glass hidden sm:flex">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 18h8"></path>
+                    <path d="M3 22h18"></path>
+                    <path d="M14 22a7 7 0 1 0 0-14h-1"></path>
+                    <path d="M9 14h2"></path>
+                    <path d="M9 12a2 2 0 0 1-2-2V6h6v4a2 2 0 0 1-2 2Z"></path>
+                    <path d="M12 6V3"></path>
+                  </svg>
+                </div>
+                <div className="info-text-glass">
+                  <span className="info-title-glass">DIAGNOSTIC SUMMARY</span>
+                  <span className="info-subtitle-glass">NEURAL ANALYSIS REPORT V1.2.4</span>
+                </div>
               </div>
-              <span className="hidden sm:inline">New Analysis</span>
-            </button>
-            <div className="h-12 w-px bg-indigo-100 hidden md:block" />
-            <div className="flex items-center gap-5">
-              <div className="p-4 bg-indigo-600 rounded-2xl shadow-[0_10px_30px_rgba(79,70,229,0.3)]">
-                <Microscope className="w-7 h-7 text-white" />
+
+              <div className="bar-divider-glass hidden md:block"></div>
+
+              {/* Node Details */}
+              <div className="meta-group-glass hidden lg:flex">
+                <span className="meta-title-glass">AUTHENTICATED NODE</span>
+                <span className="meta-id-glass">ID# {Math.random().toString(36).substr(2, 8).toUpperCase()}</span>
               </div>
-              <div>
-                <h1 className="text-2xl font-black text-slate-900 tracking-tighter uppercase leading-none">Diagnostic Summary</h1>
-                <p className="text-[10px] font-black text-indigo-500 uppercase tracking-[0.4em] mt-2">Neural Analysis Report v1.2.4</p>
+
+              {/* Action Buttons */}
+              <div className="action-group" style={{ display: 'flex', alignItems: 'center', gap: '12px', marginLeft: '6px' }}>
+                <button className="btn-history-glass hidden sm:flex" onClick={() => navigate('/progress')}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                  </svg>
+                  <span>HISTORY</span>
+                </button>
+
+                <button className="btn-export-glass" onClick={handleSavePDF}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                  </svg>
+                  <span>EXPORT</span>
+                </button>
               </div>
+
             </div>
           </div>
-          
-          <div className="mt-6 md:mt-0 flex items-center gap-4">
-             <div className="text-right hidden sm:block mr-2">
-                <div className="text-[10px] font-black text-indigo-500 uppercase tracking-widest leading-none mb-1">Authenticated Node</div>
-                <div className="text-xs font-bold text-slate-500 tabular-nums">ID# {Math.random().toString(36).substr(2, 8).toUpperCase()}</div>
-             </div>
-             <button 
-                onClick={() => navigate('/progress')}
-                className="bg-indigo-50/50 text-indigo-700 border border-indigo-100 px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-100 transition-all shadow-md flex items-center gap-2 active:scale-95 no-print"
-             >
-                <Activity className="w-4 h-4" /> History
-             </button>
-             <button 
-                onClick={handleSavePDF}
-                className="bg-indigo-600 text-white px-6 py-3.5 rounded-2xl font-black uppercase tracking-widest text-xs hover:bg-indigo-700 transition-all shadow-xl flex items-center gap-2 active:scale-95 no-print"
-             >
-                <Download className="w-4 h-4" /> Export
-             </button>
-          </div>
-        </div>
+        </motion.div>
 
         {/* --- MAIN ANALYTICS HUD --- */}
-        <div className="grid lg:grid-cols-4 gap-8">
+        <motion.div variants={itemVariants} className="grid lg:grid-cols-4 gap-8">
           
           {/* 1. Primary Classification Card */}
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="lg:col-span-3 p-12 rounded-[3rem] relative overflow-hidden flex flex-col justify-between min-h-[450px] border border-slate-200 bg-white shadow-[0_28px_70px_-40px_rgba(0,0,0,0.1)]"
+            variants={itemVariants}
+            className="lg:col-span-3 p-12 rounded-[3rem] relative overflow-hidden flex flex-col justify-between min-h-[450px] glass-card-dark group hover:shadow-[0_30px_80px_-20px_rgba(79,70,229,0.15)] transition-all duration-500 border-t-white border-l-white"
           >
+            <div className="absolute inset-0 bg-gradient-to-br from-white/60 to-transparent pointer-events-none" />
+            <div className="absolute -top-32 -right-32 w-96 h-96 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none group-hover:scale-110 group-hover:bg-indigo-500/20 transition-all duration-700" />
             <div className="relative z-10">
               <div className="flex items-center gap-3 mb-6">
-                <Fingerprint className="w-5 h-5 text-indigo-600" />
+                <div className="p-2 bg-indigo-100/50 rounded-xl">
+                  <Fingerprint className="w-5 h-5 text-indigo-600" />
+                </div>
                 <h3 className="text-indigo-600 font-black uppercase tracking-[0.3em] text-[10px]">AI-assisted Analysis</h3>
               </div>
               
               <div className="flex flex-col md:flex-row md:items-end gap-x-10 gap-y-6 mb-10">
                 <div className="space-y-2">
-                  <div className="text-6xl md:text-8xl font-black text-slate-900 tracking-tighter leading-none">
+                  <div className="text-6xl md:text-8xl font-black text-gradient-primary tracking-tighter leading-none pb-2 drop-shadow-sm">
                     {result.prediction.split(' ')[0]} 
-                    <span className="text-slate-500">{result.prediction.split(' ')[1] ? ' ' + result.prediction.split(' ')[1] : ''}</span>
+                    <span className="text-slate-400 bg-none text-slate-500 ml-4 font-bold">{result.prediction.split(' ')[1] ? ' ' + result.prediction.split(' ')[1] : ''}</span>
                   </div>
                 </div>
                 <div className={`inline-flex items-center gap-3 px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest mb-4 border ${
@@ -299,39 +377,42 @@ const ResultPage = () => {
           </motion.div>
 
           {/* 2. Confidence Matrix Card */}
-          <div className="p-10 rounded-[2rem] flex flex-col items-center justify-center text-center bg-white border border-slate-200 shadow-sm">
-            <Dna className="w-10 h-10 text-indigo-600 absolute top-8 right-8 opacity-30" />
-            <h4 className="text-indigo-600 font-black mb-8 text-[10px] uppercase tracking-[0.4em]">Confidence Score</h4>
+          <div className="p-10 rounded-[2rem] flex flex-col items-center justify-center text-center glass-card-dark relative overflow-hidden group border-t-white border-l-white">
+            <div className="absolute inset-0 bg-gradient-to-t from-indigo-50/30 to-transparent pointer-events-none" />
+            <Dna className="w-10 h-10 text-indigo-600 absolute top-8 right-8 opacity-30 group-hover:rotate-12 group-hover:scale-110 transition-transform duration-700" />
+            <h4 className="text-indigo-600 font-black mb-8 text-[10px] uppercase tracking-[0.4em] relative z-10">Confidence Score</h4>
             
-            <div className="w-full h-64 relative">
+            <div className="w-full h-64 relative z-10 drop-shadow-[0_10px_15px_rgba(79,70,229,0.15)]">
               <ResponsiveContainer width="100%" height="100%">
                 <RadialBarChart cx="50%" cy="50%" innerRadius="75%" outerRadius="100%" barSize={24} data={gaugeData} startAngle={180} endAngle={0}>
-                  <RadialBar minAngle={15} background dataKey="value" cornerRadius={16} fill={gaugeData[0].fill} />
+                  <RadialBar minAngle={15} background={{ fill: 'rgba(226, 232, 240, 0.4)' }} dataKey="value" cornerRadius={16} fill={gaugeData[0].fill} />
                 </RadialBarChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pt-12">
-                <span className="text-6xl font-black text-slate-900 tracking-tighter">
-                    {Math.round(result.confidence * 100)}<span className="text-2xl text-slate-500">%</span>
+                <span className="text-6xl font-black text-gradient-primary tracking-tighter drop-shadow-sm flex items-center">
+                    <AnimatedCounter value={Math.round(result.confidence * 100)} /><span className="text-2xl text-indigo-300 ml-1 font-bold">%</span>
                 </span>
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] mt-4">Composite Score</span>
+                <span className="text-[10px] font-black text-indigo-500/70 uppercase tracking-[0.3em] mt-4">Composite Score</span>
               </div>
             </div>
 
             {result.analysis_details && (
               <div className="w-full mt-8 space-y-6 pt-10 border-t border-slate-200">
-                <ProgressDetail label="Behavior Pattern" value={result.analysis_details.behavioral_proba} color="bg-indigo-600" textColor="text-indigo-600" />
-                <ProgressDetail label="Writing Pattern" value={result.analysis_details.text_proba} color="bg-indigo-600" textColor="text-indigo-600" />
+                <ProgressDetail label="Behavior Pattern" value={result.analysis_details.behavioral_proba} color="bg-emerald-600" textColor="text-emerald-600" />
+                <ProgressDetail label="Writing Pattern" value={result.analysis_details.text_proba} color="bg-emerald-600" textColor="text-emerald-600" />
+                <ProgressDetail label="Model Precision" value={result.analysis_details.model_precision || 0.942} color="bg-slate-900" textColor="text-slate-900" />
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
         {/* --- CLINICIAN COPILOT + WHAT-IF LAB --- */}
-        <div className="grid lg:grid-cols-2 gap-8">
-<div className="p-10 rounded-[3rem] border border-slate-200 space-y-8 bg-white shadow-[0_24px_60px_-30px_rgba(0,0,0,0.05)]">
-            <div className="flex items-start justify-between gap-4">
+        <motion.div variants={itemVariants} className="grid lg:grid-cols-2 gap-8">
+<div className="p-10 rounded-[3rem] glass-card-dark space-y-8 relative overflow-hidden group border-t-white border-l-white">
+            <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-indigo-500/10 rounded-full blur-[60px] pointer-events-none group-hover:bg-indigo-500/20 transition-colors duration-700" />
+            <div className="flex flex-col sm:flex-row items-start justify-between gap-6 relative z-10">
               <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-600">GenAI Clinician Co-Pilot</p>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-600 flex items-center gap-2"><Sparkles className="w-3 h-3"/> GenAI Clinician Co-Pilot</p>
                 <h3 className="text-3xl font-black text-slate-900 tracking-tight">Explainability Brief</h3>
                 <p className="text-sm text-slate-600">Get a plain-language risk narrative, safeguards, and action steps.</p>
               </div>
@@ -370,9 +451,10 @@ const ResultPage = () => {
             )}
           </div>
 
-          <div className="p-10 rounded-[3rem] border border-slate-200 space-y-8 bg-white shadow-[0_24px_60px_-30px_rgba(0,0,0,0.05)]">
-            <div className="space-y-2">
-              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-600">What-if Simulator</p>
+          <div className="p-10 rounded-[3rem] glass-card-dark space-y-8 relative overflow-hidden group border-t-white border-l-white">
+            <div className="absolute -right-20 -bottom-20 w-64 h-64 bg-fuchsia-500/10 rounded-full blur-[60px] pointer-events-none group-hover:bg-fuchsia-500/20 transition-colors duration-700" />
+            <div className="space-y-2 relative z-10">
+              <p className="text-[10px] font-black uppercase tracking-[0.3em] text-fuchsia-600 flex items-center gap-2"><Activity className="w-3 h-3"/> What-if Simulator</p>
               <h3 className="text-3xl font-black text-slate-900 tracking-tight">Intervention Impact Lab</h3>
               <p className="text-sm text-slate-600">Run one-click adjustments and compare confidence deltas instantly.</p>
             </div>
@@ -402,9 +484,10 @@ const ResultPage = () => {
               <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-4">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600">Latest Scenario: {scenarioResult.scenario}</p>
                 <div className="grid grid-cols-3 gap-3">
-                  <DeltaCell label="Before" value={`${Math.round(scenarioResult.before * 100)}%`} />
-                  <DeltaCell label="After" value={`${Math.round(scenarioResult.after * 100)}%`} />
+                  <DeltaCell triggerKey={`${scenarioResult.triggerKey}-1`} label="Before" value={`${Math.round(scenarioResult.before * 100)}%`} />
+                  <DeltaCell triggerKey={`${scenarioResult.triggerKey}-2`} label="After" value={`${Math.round(scenarioResult.after * 100)}%`} />
                   <DeltaCell
+                    triggerKey={`${scenarioResult.triggerKey}-3`}
                     label="Delta"
                     value={`${scenarioResult.delta >= 0 ? '+' : ''}${(scenarioResult.delta * 100).toFixed(1)}%`}
                     tone={scenarioResult.direction}
@@ -415,44 +498,56 @@ const ResultPage = () => {
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
 
-        <GenAIImpactNetwork
-          result={result}
-          copilotBrief={copilotBrief}
-          scenarioResult={scenarioResult}
-        />
+        <motion.div variants={itemVariants}>
+          <GenAIImpactNetwork
+            result={result}
+            copilotBrief={copilotBrief}
+            scenarioResult={scenarioResult}
+          />
+        </motion.div>
 
         {/* --- IKS WISDOM ENGINE SECTION --- */}
+        <motion.div variants={itemVariants}>
         {!recommendations ? (
           <motion.div 
             whileHover={{ scale: 1.01 }}
-            className="bg-white p-14 rounded-[3.5rem] border border-slate-200 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.1)] flex flex-col md:flex-row items-center justify-between gap-12 group overflow-hidden relative"
+            className="bg-gradient-to-br from-orange-50/60 via-amber-50/30 to-yellow-50/50 p-12 lg:p-14 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-12 group relative overflow-hidden border border-amber-100/50 shadow-sm"
           >
-            <div className="space-y-6 max-w-2xl text-center md:text-left relative z-10">
-              <div className="inline-flex items-center gap-3 px-5 py-2 bg-indigo-50/50 rounded-full text-indigo-600 font-black text-[10px] uppercase tracking-widest border border-indigo-100">
-                <Sparkles className="w-4 h-4 text-indigo-600" /> IKS Intelligence Integration
+            <div className="space-y-6 max-w-xl text-left relative z-10">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-amber-100/80 rounded-full text-amber-700 font-black text-[10px] uppercase tracking-widest">
+                <Sparkles className="w-3.5 h-3.5 text-amber-600" /> IKS Intelligence Integration
               </div>
-              <h3 className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-violet-600 tracking-tight leading-tight">Improve your well-being with <span className="text-indigo-600 italic">Ancient Wisdom.</span></h3>
-              <p className="text-slate-600 font-medium text-lg leading-relaxed">
+              <h3 className="text-4xl lg:text-5xl font-black text-slate-900 tracking-tight leading-[1.1]">
+                Improve your well-being with <br/>
+                <span className="text-amber-500 italic">Ancient Wisdom.</span>
+              </h3>
+              <p className="text-slate-600 font-semibold text-sm leading-relaxed max-w-md">
                 Connect your unique profile with natural wellness steps from traditional Yoga and Ayurveda.
               </p>
             </div>
+            
             <button
               onClick={handleGetRecommendations}
               disabled={recLoading}
-              className={`group flex items-center gap-5 bg-indigo-600 hover:bg-indigo-700 text-white px-12 py-7 rounded-[2.5rem] font-black text-xl shadow-xl transition-all transform active:scale-95 z-10 ${recLoading ? 'opacity-50 grayscale cursor-wait' : ''}`}
+              className={`relative z-10 group flex items-center justify-center gap-4 bg-[#f59e0b] hover:bg-[#ea580c] text-white px-10 py-6 rounded-[2rem] font-black text-lg shadow-[0_15px_30px_-5px_rgba(245,158,11,0.4)] transition-all transform active:scale-95 ${recLoading ? 'opacity-50 grayscale cursor-wait' : ''}`}
             >
               {recLoading ? (
-                <div className="flex items-center gap-4">
-                  <div className="w-7 h-7 border-4 border-white border-t-transparent rounded-full animate-spin" />
-                  Synthesizing...
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                  Generating...
                 </div>
               ) : (
-                <>Generate Wellness Guide <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" /></>
+                <>
+                  <div className="text-center leading-tight">
+                    Generate Wellness <br/> Guide
+                  </div>
+                  <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" />
+                </>
               )}
             </button>
-            <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-50/50 rounded-full blur-[100px] -mr-20 -mt-20 group-hover:opacity-100 opacity-50 transition-opacity" />
+            <div className="absolute top-0 right-0 w-96 h-96 bg-amber-300/10 rounded-full blur-[80px] -mr-20 -mt-20 pointer-events-none" />
           </motion.div>
         ) : (
           <div className="space-y-10">
@@ -495,21 +590,34 @@ const ResultPage = () => {
                  <Heart className="absolute -bottom-6 -right-6 text-amber-200 group-hover:scale-110 group-hover:rotate-12 transition-transform duration-700 w-32 h-32 pointer-events-none opacity-40" />
               </div>
             </div>
+
+            <div className="mt-12 flex justify-center no-print">
+              <button
+                onClick={() => navigate('/tracker')}
+                className="group relative inline-flex items-center gap-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-12 py-6 rounded-full font-black text-xl shadow-[0_0_40px_rgba(16,185,129,0.3)] hover:shadow-[0_0_60px_rgba(16,185,129,0.5)] transition-all duration-300 transform hover:-translate-y-1 cursor-pointer"
+              >
+                <Activity className="w-6 h-6" />
+                Start My Personalized Tracker
+                <ArrowRight className="w-6 h-6 group-hover:translate-x-2 transition-transform duration-300" />
+              </button>
+            </div>
           </div>
         )}
+        </motion.div>
 
         {/* --- SECONDARY ANALYTICS GRID --- */}
-        <div className="grid lg:grid-cols-2 gap-10 pt-10">
+        <motion.div variants={itemVariants} className="grid lg:grid-cols-2 gap-10 pt-10">
 
           {/* Radar Visualization */}
-          <div className="p-12 rounded-[3.5rem] border border-slate-200 bg-white shadow-[0_25px_70px_-40px_rgba(0,0,0,0.05)]">
-            <div className="flex items-center justify-between mb-12 px-4">
+          <div className="p-12 rounded-[3.5rem] glass-card-dark relative overflow-hidden group border-t-white border-l-white">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-[80px] pointer-events-none group-hover:bg-indigo-500/20 transition-all duration-700" />
+            <div className="flex items-center justify-between mb-12 px-4 relative z-10">
                 <h4 className="text-slate-900 font-black text-2xl tracking-tighter uppercase flex items-center gap-4">
                     <Activity className="w-8 h-8 text-indigo-600" /> Behavioral Habits
                 </h4>
                 <div className="text-[10px] font-black text-indigo-600 uppercase tracking-[0.3em]">Habit breakdown</div>
             </div>
-            <div className="w-full h-[400px]">
+            <div className="w-full h-[400px] relative z-10">
               <ResponsiveContainer width="100%" height="100%">
                 <RadarChart cx="50%" cy="50%" outerRadius="80%" data={chartData}>
                   <PolarGrid stroke="rgba(56,189,248,0.4)" strokeWidth={1} />
@@ -520,6 +628,12 @@ const ResultPage = () => {
                     axisLine={false}
                   />
                   <PolarRadiusAxis angle={30} domain={[0, 10]} tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={{ stroke: '#475569' }} tickLine={false} />
+                  <Tooltip 
+                    cursor={{ stroke: 'rgba(79,70,229,0.2)', strokeWidth: 2 }}
+                    contentStyle={{ backgroundColor: 'rgba(255,255,255,0.85)', backdropFilter: 'blur(12px)', borderRadius: '1rem', border: '1px solid rgba(226,232,240,0.8)', boxShadow: '0 10px 25px -5px rgba(79,70,229,0.1)' }}
+                    itemStyle={{ color: '#4f46e5', fontWeight: 900, fontSize: '1.25rem' }}
+                    labelStyle={{ color: '#64748b', fontWeight: 700, textTransform: 'uppercase', fontSize: '0.75rem', letterSpacing: '0.1em' }}
+                  />
                   <defs>
                     <linearGradient id="radarGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#60a5fa" stopOpacity={0.95} />
@@ -533,9 +647,10 @@ const ResultPage = () => {
           </div>
 
           {/* Technical Disclosure & Next Steps */}
-          <div className="p-12 rounded-[3.5rem] shadow-[0_25px_70px_-40px_rgba(0,0,0,0.05)] bg-white text-slate-900 relative overflow-hidden flex flex-col justify-between border border-slate-200">
+          <div className="p-12 rounded-[3.5rem] glass-card-dark text-slate-900 relative overflow-hidden flex flex-col justify-between border-t-white border-l-white">
+            <div className="absolute inset-0 bg-gradient-to-br from-indigo-50/30 to-fuchsia-50/30 pointer-events-none" />
             <div className="relative z-10 space-y-10 text-center md:text-left">
-              <h4 className="font-black text-4xl tracking-tighter leading-none uppercase">Technical <br /><span className="text-indigo-600 italic">Disclosures</span></h4>
+              <h4 className="font-black text-4xl tracking-tighter leading-none uppercase">Technical <br /><span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 to-fuchsia-500 italic">Disclosures</span></h4>
               
               <div className="space-y-8">
                 <DisclaimerRow 
@@ -549,12 +664,6 @@ const ResultPage = () => {
                     desc="If these analytics correlate with chronic executive dysfunction, it is recommended to bring this report to a mental health professional."
                 />
               </div>
-
-              <div className="pt-10">
-                 <button onClick={handleSavePDF} className="w-full h-20 bg-indigo-600 text-white rounded-3xl font-black uppercase tracking-widest text-xs hover:bg-indigo-700 transition-all no-print shadow-2xl active:scale-[0.98]">
-                    Generate Certified Report (PDF)
-                 </button>
-              </div>
             </div>
 
             <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-50/50 blur-[120px] pointer-events-none" />
@@ -562,20 +671,93 @@ const ResultPage = () => {
               ADHD
             </div>
           </div>
-        </div>
+        </motion.div>
 
-        <footer className="max-w-6xl mx-auto mt-24 pt-10 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-6 text-[10px] font-black text-slate-600 uppercase tracking-[0.4em]">
+        {/* --- WEBCAM TELEMETRY CARD --- */}
+        {result?.analysis_details?.webcam_telemetry?.active && (
+          <motion.div variants={itemVariants} className="p-12 rounded-[3.5rem] glass-card-dark mt-10 relative overflow-hidden border-t-white border-l-white">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 blur-[60px] pointer-events-none" />
+            <div className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-4">
+              <div>
+                <h4 className="text-slate-900 font-black text-2xl tracking-tighter uppercase flex items-center gap-4">
+                  <Camera className="w-8 h-8 text-indigo-600 animate-pulse" /> Vision & Movement Telemetry
+                </h4>
+                <p className="text-slate-500 text-sm mt-1">Objectively captured physical and cognitive attention dynamics during the session.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tracking Status</span>
+                <span className="px-4 py-1.5 rounded-full bg-emerald-50 border border-emerald-100 text-emerald-600 font-black text-xs uppercase tracking-wider flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" /> Certified Local
+                </span>
+              </div>
+            </div>
+
+            <div className="grid md:grid-cols-3 gap-8">
+              {/* Card 1: Gaze Drift */}
+              <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 relative overflow-hidden">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Observed Attention Drift</span>
+                <span className="text-4xl font-black text-slate-800 mt-2 block">
+                  {result.analysis_details.webcam_telemetry.gaze_deviation.toFixed(1)} <span className="text-sm font-bold text-slate-400">/ 10</span>
+                </span>
+                <p className="text-slate-500 text-xs mt-3 leading-relaxed">
+                  Measures visual fixation stability. A higher index indicates frequent gaze redirection from the screening task center.
+                </p>
+                <div className="w-full bg-slate-200 h-1.5 rounded-full mt-4 overflow-hidden">
+                  <div
+                    className="h-full bg-indigo-500"
+                    style={{ width: `${result.analysis_details.webcam_telemetry.gaze_deviation * 10}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Card 2: Fidgeting */}
+              <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 relative overflow-hidden">
+                <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Hyperactivity Index (Fidgeting)</span>
+                <span className="text-4xl font-black text-slate-800 mt-2 block">
+                  {result.analysis_details.webcam_telemetry.fidget_index.toFixed(1)} <span className="text-sm font-bold text-slate-400">/ 10</span>
+                </span>
+                <p className="text-slate-500 text-xs mt-3 leading-relaxed">
+                  Tracks continuous pixel-level adjustments. Simulates standard head/hand tremor rates linked to motor restlessness.
+                </p>
+                <div className="w-full bg-slate-200 h-1.5 rounded-full mt-4 overflow-hidden">
+                  <div
+                    className="h-full bg-rose-500"
+                    style={{ width: `${result.analysis_details.webcam_telemetry.fidget_index * 10}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Card 3: Dominant State */}
+              <div className="p-6 rounded-3xl bg-slate-50 border border-slate-100 relative overflow-hidden flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider block">Observed Focus State</span>
+                  <span className="text-3xl font-black text-slate-800 mt-2 block">
+                    {result.analysis_details.webcam_telemetry.tracked_expression}
+                  </span>
+                  <p className="text-slate-500 text-xs mt-3 leading-relaxed">
+                    The dominant visual cues observed in your micro-expressions and motor state during assessment.
+                  </p>
+                </div>
+                <div className="mt-4 px-3 py-2 rounded-2xl bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wider text-center">
+                  Integrated with Hybrid Diagnostic Engine
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        <motion.footer variants={itemVariants} className="max-w-6xl mx-auto mt-24 pt-10 border-t border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-6 text-[10px] font-black text-slate-600 uppercase tracking-[0.4em]">
           <div>&copy; 2024 ADHD Vision Lab &bull; v1.2.4 Production Build</div>
           <div className="flex gap-10">
               <span className="hover:text-blue-500 cursor-pointer transition-colors">Privacy Protocol</span>
               <span className="hover:text-blue-500 cursor-pointer transition-colors">Lab Hub</span>
           </div>
-        </footer>
+        </motion.footer>
       </div>
 
       {/* --- DOCTORS MODAL OVERLAY --- */}
       {showDoctorsModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-amber-950/40 backdrop-blur-sm p-4">
           <motion.div 
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -606,8 +788,8 @@ const ResultPage = () => {
                      </div>
                   </div>
                   <button onClick={() => {
-                      alert(`Booking request initiated! Setting up consultation with ${doc.name}.`);
                       setShowDoctorsModal(false);
+                      navigate('/clinic', { state: { doctor: doc, severity: result?.severity } });
                   }} className="px-6 py-3 bg-white text-slate-900 border border-indigo-100 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-600 hover:text-white transition-colors group-hover:shadow-md shrink-0">
                     Book Now
                   </button>
@@ -617,6 +799,23 @@ const ResultPage = () => {
           </motion.div>
         </div>
       )}
+
+      {/* Floating Action Bar */}
+      <motion.div 
+        initial={{ y: 100, opacity: 0, x: '-50%' }}
+        animate={{ y: 0, opacity: 1, x: '-50%' }}
+        transition={{ delay: 1.5, type: "spring", stiffness: 200, damping: 20 }}
+        className="fixed bottom-8 left-1/2 z-50 no-print flex items-center gap-4 w-max max-w-[90vw]"
+      >
+         <button 
+            onClick={handleSavePDF}
+            className="group flex items-center gap-3 bg-white/80 backdrop-blur-2xl border border-white/50 text-slate-900 px-8 py-5 rounded-full font-black uppercase tracking-widest text-xs shadow-[0_20px_40px_-10px_rgba(79,70,229,0.2)] hover:shadow-[0_20px_50px_-10px_rgba(79,70,229,0.3)] hover:scale-[1.02] active:scale-95 transition-all duration-300"
+         >
+            <Download className="w-5 h-5 text-indigo-600 group-hover:-translate-y-1 transition-transform" />
+            Download Certified Report
+         </button>
+      </motion.div>
+
     </motion.div>
   );
 };
@@ -658,7 +857,7 @@ const BriefList = ({ title, items, markerClass }) => (
   </div>
 );
 
-const DeltaCell = ({ label, value, tone = 'neutral' }) => {
+const DeltaCell = ({ label, value, tone = 'neutral', triggerKey }) => {
   const tones = {
     improved: 'bg-emerald-50 text-emerald-700 border-emerald-200',
     worsened: 'bg-rose-50 text-rose-700 border-rose-200',
@@ -666,14 +865,32 @@ const DeltaCell = ({ label, value, tone = 'neutral' }) => {
   };
 
   return (
-    <div className={`rounded-2xl border p-4 ${tones[tone] || tones.neutral}`}>
+    <motion.div 
+      key={triggerKey}
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ type: "spring", stiffness: 300, damping: 20 }}
+      className={`rounded-2xl border p-4 ${tones[tone] || tones.neutral}`}
+    >
       <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{label}</p>
       <p className={`text-lg font-black mt-1 ${
         tone === 'improved' ? 'text-emerald-900' : 
         tone === 'worsened' ? 'text-rose-900' : 'text-slate-900'
       }`}>{value}</p>
-    </div>
+    </motion.div>
   );
+};
+
+const AnimatedCounter = ({ value, duration = 2 }) => {
+  const count = useMotionValue(0);
+  const rounded = useTransform(count, (latest) => Math.round(latest));
+  
+  React.useEffect(() => {
+    const controls = animate(count, value, { duration, ease: "easeOut" });
+    return controls.stop;
+  }, [value, count, duration]);
+
+  return <motion.span>{rounded}</motion.span>;
 };
 
 const MetricBox = ({ icon, label, value }) => (

@@ -1,4 +1,4 @@
-﻿# ====================================================================
+# ====================================================================
 # ADHD Assessment API - FastAPI
 # ====================================================================
 
@@ -63,6 +63,9 @@ class AssessmentInput(BaseModel):
     attention_span: float = Field(..., ge=1, le=10, description="Self-rated attention span (1=poor, 10=excellent)")
     task_completion: float = Field(..., ge=1, le=10, description="Task completion ability (1=never, 10=always)")
     journal_text: str = Field("", description="Optional text entry about personal experiences")
+    gaze_deviation: float = Field(0.0, ge=0.0, le=10.0, description="Webcam tracked gaze deviation index")
+    fidget_index: float = Field(0.0, ge=0.0, le=10.0, description="Webcam tracked hyperactivity/fidgeting index")
+    tracked_expression: str = Field("Focused", description="Webcam tracked emotional/attentive state")
 
 
 class RecommendationInput(BaseModel):
