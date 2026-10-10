@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { getCopilotBrief, getRecommendations, predictADHD } from '../services/api';
 import GenAIImpactNetwork from '../components/GenAIImpactNetwork';
-import html2pdf from 'html2pdf.js';
+
 
 const ResultPage = () => {
   const location = useLocation();
@@ -67,34 +67,83 @@ const ResultPage = () => {
     setShowDoctorsModal(true);
   };
 
-  const handleSavePDF = () => {
-    const element = document.getElementById('report-container');
-    if (!element) return window.print(); // Fallback
-    
-    document.body.classList.add('printing-pdf');
+  const [isGeneratingPDF, setIsGeneratingPDF] = React.useState(false);
+  const [includeJournal, setIncludeJournal] = React.useState(false);
 
-    const opt = {
-      margin:       [10, 10, 10, 10], // top, left, bottom, right in mm
-      filename:     `NeuroSync_ADHD_Clinical_Report_${Date.now().toString().slice(-6)}.pdf`,
-      image:        { type: 'jpeg', quality: 0.98 },
-      html2canvas:  { 
-        scale: 2, 
-        useCORS: true, 
-        backgroundColor: '#ffffff',
-        logging: false,
-        ignoreElements: (node) => node.classList && node.classList.contains('no-print')
-      },
-      jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak:    { mode: ['avoid-all', 'css', 'legacy'] }
-    };
+  const handleSavePDF = async () => {
+    setIsGeneratingPDF(true);
+    try {
+      const { pdf } = await import('@react-pdf/renderer');
+      const { PDFReport } = await import('../components/PDFReport.jsx');
+      
+      const blob = await pdf(<PDFReport result={result} inputData={inputData} includeJournal={includeJournal} />).toBlob();
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.download = `screening-report-${dateStr}.pdf`;
+      link.click();
+      
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      alert("Error generating PDF: " + (err.message || String(err)));
+    } finally {
+      setIsGeneratingPDF(false);
+    }
+  };
 
-    html2pdf().set(opt).from(element).save().then(() => {
-        document.body.classList.remove('printing-pdf');
-    }).catch(err => {
-        console.error("PDF generation failed, using standard print fallback:", err);
-        document.body.classList.remove('printing-pdf');
-        window.print();
-    });
+  const generateTestPDF = async (level) => {
+    setIsGeneratingPDF(true);
+    try {
+      const { pdf } = await import('@react-pdf/renderer');
+      const { PDFReport } = await import('../components/PDFReport.jsx');
+      
+      const testInput = {
+        age: 30, gender: 'Non-binary', education: 'Bachelors Degree',
+        sleep_hours: level === 'elevated' ? 4 : 7,
+        screen_time: level === 'elevated' ? 12 : 4,
+        q1: 1, q2: 2, q3: 3, q4: 4, q5: 0, q6: 1, q7: 2, q8: 3, q9: 4,
+        q10: 0, q11: 1, q12: 2, q13: 3, q14: 4, q15: 0, q16: 1, q17: 2, q18: 3,
+        quiz_attempted: true,
+        journal_text: "This is a sample journal entry for testing the PDF report generation feature. It contains some text that might indicate various states of focus or distraction.",
+        quiz_metrics: {
+          reaction: { avgRT: 450, variability: 120, raw: [300, 350, 600, 800, 400, 350, 400, 500, 900, 300, 320, 350] },
+          gono: { errors: level === 'elevated' ? 5 : 1, trials: 12 },
+          memory: { level: level === 'elevated' ? 3 : 7, fails: 0 }
+        }
+      };
+
+      const testResult = {
+        confidence: level === 'elevated' ? 0.85 : level === 'moderate' ? 0.55 : 0.15,
+        prediction: level === 'elevated' ? "High Risk" : level === 'moderate' ? "Moderate Risk" : "Low Risk",
+        severity: level === 'elevated' ? "High" : level === 'moderate' ? "Moderate" : "Low",
+        behavioral_scores: {
+          part_a_score: level === 'elevated' ? 24 : level === 'moderate' ? 14 : 6,
+          part_b_score: level === 'elevated' ? 22 : level === 'moderate' ? 12 : 5,
+          quiz_score: level === 'elevated' ? 0.8 : level === 'moderate' ? 0.4 : 0.1
+        },
+        analysis_details: {
+          text_proba: level === 'elevated' ? 0.75 : 0.2
+        }
+      };
+
+      const blob = await pdf(<PDFReport result={testResult} inputData={testInput} includeJournal={true} />).toBlob();
+      
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `test-report-${level}.pdf`;
+      link.click();
+      
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (err) {
+      console.error("Test PDF generation failed:", err);
+      alert("Error generating test PDF: " + (err.message || String(err)));
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   const handleGetRecommendations = async () => {
@@ -145,16 +194,10 @@ const ResultPage = () => {
     try {
       const adjustedInput = scenario.transform({ ...inputData });
       const simulation = await predictADHD({
+        ...adjustedInput,
         age: parseInt(adjustedInput.age, 10),
         sleep_hours: parseFloat(adjustedInput.sleep_hours),
         screen_time: parseFloat(adjustedInput.screen_time),
-        focus_level: parseFloat(adjustedInput.focus_level),
-        hyperactivity: parseFloat(adjustedInput.hyperactivity),
-        impulsiveness: parseFloat(adjustedInput.impulsiveness),
-        stress_level: parseFloat(adjustedInput.stress_level),
-        attention_span: parseFloat(adjustedInput.attention_span),
-        task_completion: parseFloat(adjustedInput.task_completion),
-        journal_text: adjustedInput.journal_text || '',
       });
 
       const baseConfidence = Number(result.confidence || 0);
@@ -219,12 +262,12 @@ const ResultPage = () => {
   }
 
   const chartData = [
-    { subject: 'Attention', A: inputData.attention_span, fullMark: 10 },
-    { subject: 'Focus', A: inputData.focus_level, fullMark: 10 },
-    { subject: 'Hyperactivity', A: inputData.hyperactivity, fullMark: 10 },
-    { subject: 'Impulsivity', A: inputData.impulsiveness, fullMark: 10 },
-    { subject: 'Stress', A: inputData.stress_level, fullMark: 10 },
-    { subject: 'Completion', A: inputData.task_completion, fullMark: 10 },
+    { subject: 'Inattention', A: ((result?.behavioral_scores?.part_a_score || 0) / 36) * 10, fullMark: 10 },
+    { subject: 'Hyperactivity', A: ((result?.behavioral_scores?.part_b_score || 0) / 36) * 10, fullMark: 10 },
+    { subject: 'Cognitive Risk', A: (result?.behavioral_scores?.quiz_score || 0) * 10, fullMark: 10 },
+    { subject: 'Text Signals', A: (result?.analysis_details?.text_proba || 0) * 10, fullMark: 10 },
+    { subject: 'Sleep (Inverted)', A: Math.max(0, 10 - (inputData.sleep_hours || 0)), fullMark: 10 },
+    { subject: 'Screen Time', A: Math.min(10, (inputData.screen_time || 0)), fullMark: 10 },
   ];
 
   const gaugeData = [
@@ -257,6 +300,8 @@ const ResultPage = () => {
         <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-slate-400/10 blur-[100px] animate-float-slow" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-emerald-300/10 blur-[120px] animate-float-medium animation-delay-2000" />
       </div>
+
+      {/* Removed html2pdf CertifiedReportTemplate completely */}
 
       <div id="report-container" className="max-w-6xl mx-auto space-y-10 relative z-10 p-2">
 
@@ -311,19 +356,40 @@ const ResultPage = () => {
                   <span>HISTORY</span>
                 </button>
 
-                <button className="btn-export-glass" onClick={handleSavePDF}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                    <polyline points="7 10 12 15 17 10"></polyline>
-                    <line x1="12" y1="15" x2="12" y2="3"></line>
-                  </svg>
-                  <span>EXPORT</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] text-slate-500 font-bold uppercase tracking-wider hidden md:flex items-center gap-1 cursor-pointer">
+                    <input type="checkbox" className="rounded bg-white/50 border-slate-300" checked={includeJournal} onChange={(e) => setIncludeJournal(e.target.checked)} />
+                    Include Journal
+                  </label>
+                  <button className="btn-export-glass" onClick={handleSavePDF} disabled={isGeneratingPDF}>
+                    {isGeneratingPDF ? (
+                      <span className="flex items-center gap-2 text-indigo-600 font-bold">
+                        <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                        BUILDING...
+                      </span>
+                    ) : (
+                      <>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                          <polyline points="7 10 12 15 17 10"></polyline>
+                          <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <span>EXPORT</span>
+                      </>
+                    )}
+                  </button>
+                </div>
               </div>
 
             </div>
           </div>
         </motion.div>
+
+        <div className="flex flex-wrap gap-2 justify-center mb-6 z-20 relative">
+          <button onClick={() => generateTestPDF('low')} className="px-3 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-lg uppercase tracking-wider">Test Low PDF</button>
+          <button onClick={() => generateTestPDF('moderate')} className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-bold rounded-lg uppercase tracking-wider">Test Mod PDF</button>
+          <button onClick={() => generateTestPDF('elevated')} className="px-3 py-1 bg-red-100 text-red-800 text-xs font-bold rounded-lg uppercase tracking-wider">Test Elev PDF</button>
+        </div>
 
         {/* --- MAIN ANALYTICS HUD --- */}
         <motion.div variants={itemVariants} className="grid lg:grid-cols-4 gap-8">
@@ -951,5 +1017,79 @@ const DisclaimerRow = ({ icon, title, desc }) => (
     </div>
   </div>
 );
+
+const CertifiedReportTemplate = React.forwardRef(({ result, inputData }, ref) => (
+  <div className="absolute top-[-9999px] left-[-9999px] w-[800px] bg-white text-slate-900 p-12 font-sans" ref={ref} id="certified-report">
+    <div className="border-b-4 border-indigo-600 pb-6 mb-8 flex items-center gap-4">
+      <Microscope className="w-12 h-12 text-indigo-600" />
+      <div>
+        <h1 className="text-4xl font-black tracking-tight text-slate-900 uppercase">NeuroSync</h1>
+        <p className="text-sm font-bold text-slate-500 uppercase tracking-widest">Certified Clinical Assessment Report</p>
+      </div>
+    </div>
+    
+    <div className="grid grid-cols-2 gap-8 mb-8">
+      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200">
+        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-4">Patient Profile</h2>
+        <div className="space-y-2 text-sm font-medium">
+          <p><span className="text-slate-500 w-24 inline-block">Age:</span> {inputData.age}</p>
+          <p><span className="text-slate-500 w-24 inline-block">Gender:</span> {inputData.gender}</p>
+          <p><span className="text-slate-500 w-24 inline-block">Education:</span> {inputData.education}</p>
+          <p><span className="text-slate-500 w-24 inline-block">Sleep:</span> {inputData.sleep_hours} hrs/night</p>
+          <p><span className="text-slate-500 w-24 inline-block">Screen Time:</span> {inputData.screen_time} hrs/day</p>
+        </div>
+      </div>
+      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col justify-center">
+        <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-500 mb-4">Primary Findings</h2>
+        <div className="space-y-4">
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Composite Match</span>
+            <span className="text-3xl font-black text-indigo-600">{Math.round(result.confidence * 100)}%</span>
+          </div>
+          <div>
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-widest block mb-1">Severity Indicator</span>
+            <span className="text-xl font-black text-rose-600 uppercase">{result.severity}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="mb-8">
+      <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 border-b-2 border-slate-200 pb-2 mb-4">Diagnostic Dimensions (DSM-5 & Cognitive)</h2>
+      <div className="space-y-4 text-sm font-medium bg-slate-50 p-6 rounded-2xl border border-slate-200">
+        <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+          <span className="text-slate-600">ASRS Part A (Inattention Subscale)</span>
+          <span className="font-bold text-slate-900">{result.behavioral_scores?.part_a_score || 0} / 36</span>
+        </div>
+        <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+          <span className="text-slate-600">ASRS Part B (Hyperactivity/Impulsivity)</span>
+          <span className="font-bold text-slate-900">{result.behavioral_scores?.part_b_score || 0} / 36</span>
+        </div>
+        <div className="flex justify-between items-center border-b border-slate-200 pb-2">
+          <span className="text-slate-600">Cognitive Risk Score (Reaction, Go/No-Go, Memory)</span>
+          <span className="font-bold text-slate-900">{Math.round((result.behavioral_scores?.quiz_score || 0) * 100)}% Risk</span>
+        </div>
+        <div className="flex justify-between items-center">
+          <span className="text-slate-600">Text & NLP Analysis (Written Expression)</span>
+          <span className="font-bold text-slate-900">{Math.round((result.analysis_details?.text_proba || 0) * 100)}% Probability</span>
+        </div>
+      </div>
+    </div>
+
+    <div className="mb-8">
+      <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 border-b-2 border-slate-200 pb-2 mb-4">Journal Extract</h2>
+      <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 text-sm italic text-slate-600 leading-relaxed">
+        "{inputData.journal_text || 'No journal provided.'}"
+      </div>
+    </div>
+
+    <div className="mt-12 text-xs font-medium text-slate-400 border-t border-slate-200 pt-6">
+      <p className="mb-2 uppercase tracking-widest font-bold text-[10px]">Technical Disclaimer</p>
+      <p className="mb-1">This report was generated by NeuroSync AI. It is a self-screening tool designed to highlight behavioral patterns and cognitive indicators.</p>
+      <p className="mb-4">It is NOT a medical diagnosis and cannot replace a professional evaluation by a qualified mental health provider.</p>
+      <p>Report Date: {new Date().toLocaleDateString()}</p>
+    </div>
+  </div>
+));
 
 export default ResultPage;

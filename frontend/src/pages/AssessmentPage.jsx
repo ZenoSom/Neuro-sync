@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Save, User, Activity, Coffee, Sparkles, Mic, MicOff, AlertCircle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, User, Activity, BrainCircuit, Sparkles, Mic, MicOff, AlertCircle } from 'lucide-react';
 import { predictADHD } from '../services/api';
 import CycleTracker from '../components/CycleTracker';
 import CameraTracker from '../components/CameraTracker';
+import CognitiveQuiz from '../components/CognitiveQuiz';
 import { useAuth } from '../context/AuthContext';
 import {
   isSpeechSupported,
@@ -22,19 +23,18 @@ const stepColors = {
   1: { orb1: 'bg-indigo-200/50', orb2: 'bg-purple-200/40', accent: 'indigo', gradient: 'from-indigo-600 to-purple-600' },
   2: { orb1: 'bg-cyan-200/50', orb2: 'bg-blue-200/40', accent: 'cyan', gradient: 'from-cyan-600 to-blue-600' },
   3: { orb1: 'bg-violet-200/50', orb2: 'bg-purple-200/40', accent: 'violet', gradient: 'from-violet-600 to-purple-600' },
-  4: { orb1: 'bg-fuchsia-200/50', orb2: 'bg-rose-200/40', accent: 'fuchsia', gradient: 'from-fuchsia-600 to-rose-600' },
+  4: { orb1: 'bg-emerald-200/50', orb2: 'bg-teal-200/40', accent: 'emerald', gradient: 'from-emerald-600 to-teal-600' },
+  5: { orb1: 'bg-fuchsia-200/50', orb2: 'bg-rose-200/40', accent: 'fuchsia', gradient: 'from-fuchsia-600 to-rose-600' },
 };
 
 /* ─────────────────────────────────────────────
-   Animated Background for Assessment (Light Neural Theme)
+   Animated Background
    ───────────────────────────────────────────── */
 const AssessmentBackground = ({ step }) => {
   const colors = stepColors[step] || stepColors[1];
   return (
     <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none bg-slate-50">
       <div className="absolute inset-0 bg-gradient-to-br from-slate-50 via-white to-indigo-50/40" />
-      
-      {/* Neural Video Background — Inverted to light mode & masked to the edges! */}
       <div 
         className="absolute inset-0 opacity-70 mix-blend-multiply"
         style={{
@@ -52,10 +52,7 @@ const AssessmentBackground = ({ step }) => {
           style={{ filter: 'invert(1) hue-rotate(180deg) contrast(1.2) saturate(1.5)' }}
         />
       </div>
-
       <div className="absolute inset-0 neural-grid animate-dot-pulse opacity-30" />
-
-      {/* Step-reactive orbs */}
       <motion.div
         key={`orb1-${step}`}
         initial={{ opacity: 0, scale: 0.8 }}
@@ -76,29 +73,56 @@ const AssessmentBackground = ({ step }) => {
 };
 
 /* ─────────────────────────────────────────────
+   ASRS Questions Definition
+   ───────────────────────────────────────────── */
+const ASRS_QUESTIONS = {
+  partA: [
+    { id: 'q1', text: "1. How often do you make careless mistakes or overlook details in school, work or other activities?" },
+    { id: 'q2', text: "2. How often do you have trouble keeping your attention on tasks or activities?" },
+    { id: 'q3', text: "3. How often do you seem not to listen when someone speaks to you directly?" },
+    { id: 'q4', text: "4. How often do you fail to follow through on instructions and leave tasks unfinished because you lose focus?" },
+    { id: 'q5', text: "5. How often do you have trouble organizing tasks and activities?" },
+    { id: 'q6', text: "6. How often do you avoid, dislike or put off tasks that need mental effort for a long time?" },
+    { id: 'q7', text: "7. How often do you lose things you need (keys, phone, wallet, paperwork, glasses)?" },
+    { id: 'q8', text: "8. How often do you get easily distracted?" },
+    { id: 'q9', text: "9. How often do you forget things in daily activities (appointments, errands, chores)?" },
+  ],
+  partB: [
+    { id: 'q10', text: "10. How often do you fidget, tap your hands or feet, or squirm in your seat?" },
+    { id: 'q11', text: "11. How often do you leave your seat when you are expected to stay seated?" },
+    { id: 'q12', text: "12. How often do you feel restless (or run/climb when it isn't appropriate)?" },
+    { id: 'q13', text: "13. How often do you find it hard to take part in leisure activities quietly?" },
+    { id: 'q14', text: "14. How often do you feel 'on the go,' as if driven by a motor?" },
+    { id: 'q15', text: "15. How often do you talk excessively?" },
+    { id: 'q16', text: "16. How often do you blurt out an answer before the question is finished?" },
+    { id: 'q17', text: "17. How often do you have trouble waiting your turn?" },
+    { id: 'q18', text: "18. How often do you interrupt or intrude on others (conversations, games)?" },
+  ]
+};
+
+/* ─────────────────────────────────────────────
    Main Assessment Page
    ───────────────────────────────────────────── */
 const AssessmentPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [step, setStep] = useState(1);
+  
   const [formData, setFormData] = useState({
     age: 22,
     gender: 'Other',
     education: 'Bachelor',
     sleep_hours: 8.0,
     screen_time: 2.0,
-    focus_level: 1.0,
-    hyperactivity: 1.0,
-    impulsiveness: 1.0,
-    stress_level: 1.0,
-    attention_span: 10.0,
-    task_completion: 10.0,
+    // ASRS questions (0=Never to 4=Very Often)
+    q1: null, q2: null, q3: null, q4: null, q5: null, q6: null, q7: null, q8: null, q9: null,
+    q10: null, q11: null, q12: null, q13: null, q14: null, q15: null, q16: null, q17: null, q18: null,
     journal_text: '',
+    quiz_score: 0.0,
+    quiz_attempted: false,
   });
-  const [loading, setLoading] = useState(false);
 
-  // Cycle tracker data (set when female user fills it)
+  const [loading, setLoading] = useState(false);
   const [cycleData, setCycleData] = useState(null);
 
   // Voice / speech-to-text state
@@ -114,39 +138,26 @@ const AssessmentPage = () => {
   const speechSupported = isSpeechSupported();
   const journalRef = useRef(null);
 
-  // Update detected emotions whenever journal text changes
   useEffect(() => {
     setDetectedEmotions(detectEmotions(formData.journal_text));
   }, [formData.journal_text]);
+
   const stepPanelTransition = { type: 'spring', stiffness: 170, damping: 22, mass: 0.85 };
+  
   const demoPersonas = {
     moderate: {
-      age: 21,
-      gender: 'Male',
-      education: 'Bachelor',
-      sleep_hours: 6.5,
-      screen_time: 6.0,
-      focus_level: 4.0,
-      hyperactivity: 6.0,
-      impulsiveness: 6.0,
-      stress_level: 7.0,
-      attention_span: 4.5,
-      task_completion: 5.0,
-      journal_text: 'I keep planning my day but get distracted quickly by messages and random thoughts. I start tasks with energy but struggle to finish on time and feel mentally exhausted by evening.',
+      age: 21, gender: 'Male', education: 'Bachelor', sleep_hours: 6.5, screen_time: 6.0,
+      q1: 2, q2: 3, q3: 2, q4: 3, q5: 2, q6: 3, q7: 2, q8: 3, q9: 2, // Part A - Inattentive leaning
+      q10: 1, q11: 1, q12: 2, q13: 1, q14: 2, q15: 1, q16: 2, q17: 1, q18: 1, // Part B
+      journal_text: 'I keep planning my day but get distracted quickly by messages and random thoughts. I start tasks with energy but struggle to finish on time.',
+      quiz_score: 0.45, quiz_attempted: true,
     },
     high: {
-      age: 24,
-      gender: 'Female',
-      education: 'Master',
-      sleep_hours: 4.5,
-      screen_time: 8.0,
-      focus_level: 2.0,
-      hyperactivity: 8.5,
-      impulsiveness: 8.0,
-      stress_level: 9.0,
-      attention_span: 2.5,
-      task_completion: 3.0,
-      journal_text: 'Most days I jump between tasks every few minutes and cannot settle. I interrupt people, lose track of deadlines, and feel overwhelmed even with simple routines. My sleep is poor and my stress is constantly high.',
+      age: 24, gender: 'Female', education: 'Master', sleep_hours: 4.5, screen_time: 8.0,
+      q1: 4, q2: 4, q3: 3, q4: 4, q5: 4, q6: 4, q7: 4, q8: 4, q9: 3, // Part A - High Inattentive
+      q10: 4, q11: 3, q12: 4, q13: 3, q14: 4, q15: 4, q16: 4, q17: 3, q18: 4, // Part B - High Hyperactive
+      journal_text: 'Most days I jump between tasks every few minutes and cannot settle. I interrupt people, lose track of deadlines, and feel overwhelmed even with simple routines.',
+      quiz_score: 0.85, quiz_attempted: true,
     },
   };
 
@@ -155,18 +166,24 @@ const AssessmentPage = () => {
     setFormData(prev => ({ ...prev, [name]: (name === 'journal_text' ? value : (parseFloat(value) || value)) }));
   };
 
-  const handleSliderChange = (name, val) => {
-    setFormData(prev => ({ ...prev, [name]: parseFloat(val) }));
+  const handleQuestionSelect = (name, value) => {
+    setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const nextStep = () => setStep(s => Math.min(s + 1, 4));
-  const prevStep = () => setStep(s => Math.max(s - 1, 1));
   const applyPersona = (key) => {
     const selected = demoPersonas[key];
-    if (selected) {
-      setFormData(selected);
-    }
+    if (selected) setFormData(selected);
   };
+
+  const canProceed = () => {
+    if (step === 2) return ASRS_QUESTIONS.partA.every(q => formData[q.id] !== null);
+    if (step === 3) return ASRS_QUESTIONS.partB.every(q => formData[q.id] !== null);
+    if (step === 4) return formData.quiz_attempted;
+    return true;
+  };
+
+  const nextStep = () => setStep(s => Math.min(s + 1, 5));
+  const prevStep = () => setStep(s => Math.max(s - 1, 1));
 
   // Voice handlers
   const handleVoiceToggle = useCallback(() => {
@@ -203,7 +220,6 @@ const AssessmentPage = () => {
     if (isListening) stopListening();
     setLoading(true);
     try {
-      // Merge emotion narrative into journal_text for backend NLP
       const emotionNarrative = buildEmotionNarrative(detectedEmotions);
       const enrichedJournal = formData.journal_text + emotionNarrative;
 
@@ -211,13 +227,15 @@ const AssessmentPage = () => {
         age: parseInt(formData.age),
         sleep_hours: parseFloat(formData.sleep_hours),
         screen_time: parseFloat(formData.screen_time),
-        focus_level: parseFloat(formData.focus_level),
-        hyperactivity: parseFloat(formData.hyperactivity),
-        impulsiveness: parseFloat(formData.impulsiveness),
-        stress_level: parseFloat(formData.stress_level),
-        attention_span: parseFloat(formData.attention_span),
-        task_completion: parseFloat(formData.task_completion),
+        q1: formData.q1 || 0, q2: formData.q2 || 0, q3: formData.q3 || 0,
+        q4: formData.q4 || 0, q5: formData.q5 || 0, q6: formData.q6 || 0,
+        q7: formData.q7 || 0, q8: formData.q8 || 0, q9: formData.q9 || 0,
+        q10: formData.q10 || 0, q11: formData.q11 || 0, q12: formData.q12 || 0,
+        q13: formData.q13 || 0, q14: formData.q14 || 0, q15: formData.q15 || 0,
+        q16: formData.q16 || 0, q17: formData.q17 || 0, q18: formData.q18 || 0,
         journal_text: enrichedJournal,
+        quiz_score: formData.quiz_score,
+        quiz_attempted: formData.quiz_attempted,
         gaze_deviation: webcamTelemetry.gaze_deviation,
         fidget_index: webcamTelemetry.fidget_index,
         tracked_expression: webcamTelemetry.tracked_expression,
@@ -225,7 +243,6 @@ const AssessmentPage = () => {
 
       const result = await predictADHD(dataToSubmit);
 
-      // Save to History
       const historyRecord = {
         date: new Date().toISOString(),
         user: user ? user.email : 'guest',
@@ -257,7 +274,6 @@ const AssessmentPage = () => {
 
   return (
     <div className="relative min-h-screen">
-      {/* Animated Background */}
       <AssessmentBackground step={step} />
 
       <motion.div 
@@ -271,340 +287,383 @@ const AssessmentPage = () => {
             initial={{ opacity: 0, y: 18, scale: 0.985 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             transition={{ duration: 0.5, ease: 'easeOut' }}
-            className="max-w-3xl w-full rounded-3xl overflow-hidden glass-card-dark"
+            className="max-w-4xl w-full rounded-3xl overflow-hidden glass-card-dark"
           >
-          {/* Progress Bar */}
-          <div className="h-1.5 bg-slate-800 w-full overflow-hidden">
-            <motion.div
-              className={`h-full bg-gradient-to-r ${colors.gradient} shadow-[0_0_15px_rgba(99,102,241,0.5)]`}
-              initial={{ width: '0%' }}
-              animate={{ width: `${(step / 4) * 100}%` }}
-              transition={{ type: "spring", stiffness: 50, damping: 20 }}
-            />
-          </div>
-
-          <div className="p-8 md:p-12">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-10">
-              <button 
-                  onClick={() => navigate('/')} 
-                  className="group flex items-center gap-2 text-indigo-400 hover:text-cyan-300 transition-all font-bold uppercase tracking-widest text-xs"
-              >
-                <div className="p-3 glass-neural rounded-2xl group-hover:border-indigo-400/30 transition-colors">
-                  <ArrowLeft className="w-5 h-5 text-indigo-400" />
-                </div>
-                <span>Exit Neural Flow</span>
-              </button>
-              
-              <div className="flex gap-2.5">
-                {[1, 2, 3, 4].map(i => (
-                  <div 
-                      key={i} 
-                      className={`h-1.5 transition-all duration-500 rounded-full ${
-                        step === i 
-                          ? `w-10 bg-gradient-to-r ${colors.gradient} shadow-[0_0_15px_rgba(99,102,241,0.5)]` 
-                          : step > i
-                            ? 'w-5 bg-indigo-500/40'
-                            : 'w-3 bg-slate-600'
-                      }`} 
-                  />
-                ))}
-              </div>
+            {/* Progress Bar */}
+            <div className="h-1.5 bg-slate-800 w-full overflow-hidden">
+              <motion.div
+                className={`h-full bg-gradient-to-r ${colors.gradient} shadow-[0_0_15px_rgba(99,102,241,0.5)]`}
+                initial={{ width: '0%' }}
+                animate={{ width: `${(step / 5) * 100}%` }}
+                transition={{ type: "spring", stiffness: 50, damping: 20 }}
+              />
             </div>
 
-
-            <AnimatePresence mode="wait">
-              {step === 1 && (
-                <motion.div
-                  key="step1"
-                  initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, y: -12, filter: 'blur(2px)' }}
-                  transition={stepPanelTransition}
-                  className="space-y-8"
+            <div className="p-8 md:p-12">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 mb-10">
+                <button 
+                    onClick={() => navigate('/')} 
+                    className="group flex items-center gap-2 text-indigo-400 hover:text-cyan-300 transition-all font-bold uppercase tracking-widest text-xs"
                 >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 text-indigo-600">
-                      <User className="w-5 h-5" />
-                      <span className="text-xs font-bold uppercase tracking-[0.2em]">Step 01</span>
-                    </div>
-                    <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Personal Profile</h2>
-                    <p className="text-slate-600 text-sm">Basic demographics for baseline comparison.</p>
+                  <div className="p-3 glass-neural rounded-2xl group-hover:border-indigo-400/30 transition-colors">
+                    <ArrowLeft className="w-5 h-5 text-indigo-400" />
                   </div>
+                  <span>Exit Assessment</span>
+                </button>
+                
+                <div className="flex gap-2.5">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div 
+                        key={i} 
+                        className={`h-1.5 transition-all duration-500 rounded-full ${
+                          step === i 
+                            ? `w-10 bg-gradient-to-r ${colors.gradient} shadow-[0_0_15px_rgba(99,102,241,0.5)]` 
+                            : step > i
+                              ? 'w-5 bg-indigo-500/40'
+                              : 'w-3 bg-slate-600'
+                        }`} 
+                    />
+                  ))}
+                </div>
+              </div>
 
-                  <div className="rounded-2xl glass-neural p-5 space-y-4">
-                    <div className="flex items-center gap-3 text-cyan-500">
-
-                      <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Preset Assessment Modes</span>
+              <AnimatePresence mode="wait">
+                {step === 1 && (
+                  <motion.div
+                    key="step1"
+                    initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, y: -12, filter: 'blur(2px)' }}
+                    transition={stepPanelTransition}
+                    className="space-y-8"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 text-indigo-600">
+                        <User className="w-5 h-5" />
+                        <span className="text-xs font-bold uppercase tracking-[0.2em]">Step 01</span>
+                      </div>
+                      <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Personal Profile</h2>
+                      <p className="text-slate-600 text-sm">Basic demographics and lifestyle factors.</p>
                     </div>
-                    <div className="grid md:grid-cols-2 gap-3">
-                      <button
-                        onClick={() => applyPersona('moderate')}
-                        className="rounded-2xl glass-neural px-4 py-3 text-left hover:border-indigo-400/30 transition-all group"
-                      >
-                        <p className="text-sm font-bold text-slate-900 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">Moderate Persona</p>
-                        <p className="text-xs text-slate-600 mt-1">Balanced but stressed profile for explainability demo.</p>
-                      </button>
-                      <button
-                        onClick={() => applyPersona('high')}
-                        className="rounded-2xl glass-neural px-4 py-3 text-left hover:border-fuchsia-400/30 transition-all group"
-                      >
-                        <p className="text-sm font-bold text-slate-900 uppercase tracking-widest group-hover:text-fuchsia-600 transition-colors">High Persona</p>
-                        <p className="text-xs text-slate-600 mt-1">Higher-risk profile for action-plan and red-flag demo.</p>
-                      </button>
-                    </div>
-                  </div>
 
-                  <div className="space-y-6">
-                    <InputGroup label="Age" name="age" value={formData.age} onChange={handleChange} min={10} max={100} type="number" />
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <SelectGroup label="Gender" name="gender" value={formData.gender} onChange={handleChange} options={['Male', 'Female', 'Other']} />
-                      <SelectGroup label="Education" name="education" value={formData.education} onChange={handleChange} options={['High School', 'Bachelor', 'Master', 'PhD']} />
-                    </div>
-
-                    {/* Cycle Tracker — only for Female users */}
-                    <AnimatePresence>
-                      {formData.gender === 'Female' && (
-                        <motion.div
-                          key="cycle-tracker"
-                          initial={{ opacity: 0, height: 0 }}
-                          animate={{ opacity: 1, height: 'auto' }}
-                          exit={{ opacity: 0, height: 0 }}
-                          transition={{ duration: 0.35 }}
+                    <div className="rounded-2xl glass-neural p-5 space-y-4">
+                      <div className="flex items-center gap-3 text-cyan-500">
+                        <span className="text-[10px] font-bold uppercase tracking-[0.2em]">Preset Assessment Modes</span>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-3">
+                        <button
+                          onClick={() => applyPersona('moderate')}
+                          className="rounded-2xl glass-neural px-4 py-3 text-left hover:border-indigo-400/30 transition-all group"
                         >
-                          <CycleTracker onCycleDataChange={setCycleData} />
+                          <p className="text-sm font-bold text-slate-900 uppercase tracking-widest group-hover:text-indigo-600 transition-colors">Moderate Persona</p>
+                          <p className="text-xs text-slate-600 mt-1">Balanced but stressed profile for explainability demo.</p>
+                        </button>
+                        <button
+                          onClick={() => applyPersona('high')}
+                          className="rounded-2xl glass-neural px-4 py-3 text-left hover:border-fuchsia-400/30 transition-all group"
+                        >
+                          <p className="text-sm font-bold text-slate-900 uppercase tracking-widest group-hover:text-fuchsia-600 transition-colors">High Persona</p>
+                          <p className="text-xs text-slate-600 mt-1">Higher-risk profile for action-plan and red-flag demo.</p>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-6">
+                      <InputGroup label="Age" name="age" value={formData.age} onChange={handleChange} min={10} max={100} type="number" />
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <SelectGroup label="Gender" name="gender" value={formData.gender} onChange={handleChange} options={['Male', 'Female', 'Other']} />
+                        <SelectGroup label="Education" name="education" value={formData.education} onChange={handleChange} options={['High School', 'Bachelor', 'Master', 'PhD']} />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-6">
+                        <InputGroup label="Sleep (Hours)" name="sleep_hours" value={formData.sleep_hours} onChange={handleChange} type="number" step="0.5" />
+                        <InputGroup label="Screen Time" name="screen_time" value={formData.screen_time} onChange={handleChange} type="number" step="0.5" />
+                      </div>
+
+                      <AnimatePresence>
+                        {formData.gender === 'Female' && (
+                          <motion.div
+                            key="cycle-tracker"
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            transition={{ duration: 0.35 }}
+                          >
+                            <CycleTracker onCycleDataChange={setCycleData} />
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </motion.div>
+                )}
+
+                {step === 2 && (
+                  <motion.div
+                    key="step2"
+                    initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, y: -12, filter: 'blur(2px)' }}
+                    transition={stepPanelTransition}
+                    className="space-y-8"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 text-cyan-600">
+                        <Activity className="w-5 h-5" />
+                        <span className="text-xs font-bold uppercase tracking-[0.2em]">Step 02 — ASRS Part A</span>
+                      </div>
+                      <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Attention & Focus</h2>
+                      <p className="text-slate-600 text-sm">Please answer based on the past 6 months.</p>
+                    </div>
+
+                    <div className="space-y-6">
+                      {ASRS_QUESTIONS.partA.map((q) => (
+                        <QuestionCard 
+                          key={q.id} 
+                          question={q} 
+                          value={formData[q.id]} 
+                          onChange={(val) => handleQuestionSelect(q.id, val)}
+                          accent="cyan" 
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {step === 3 && (
+                  <motion.div
+                    key="step3"
+                    initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, y: -12, filter: 'blur(2px)' }}
+                    transition={stepPanelTransition}
+                    className="space-y-8"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 text-violet-600">
+                        <Activity className="w-5 h-5" />
+                        <span className="text-xs font-bold uppercase tracking-[0.2em]">Step 03 — ASRS Part B</span>
+                      </div>
+                      <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Activity & Impulses</h2>
+                      <p className="text-slate-600 text-sm">Please answer based on the past 6 months.</p>
+                    </div>
+
+                    <div className="space-y-6">
+                      {ASRS_QUESTIONS.partB.map((q) => (
+                        <QuestionCard 
+                          key={q.id} 
+                          question={q} 
+                          value={formData[q.id]} 
+                          onChange={(val) => handleQuestionSelect(q.id, val)}
+                          accent="violet" 
+                        />
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+                {step === 4 && (
+                  <motion.div
+                    key="step4"
+                    initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, y: -12, filter: 'blur(2px)' }}
+                    transition={stepPanelTransition}
+                    className="space-y-8"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 text-emerald-600">
+                        <BrainCircuit className="w-5 h-5" />
+                        <span className="text-xs font-bold uppercase tracking-[0.2em]">Step 04</span>
+                      </div>
+                      <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Cognitive Quizzes</h2>
+                      <p className="text-slate-600 text-sm">Interactive tasks measuring attention and working memory.</p>
+                    </div>
+
+                    {!formData.quiz_attempted ? (
+                      <CognitiveQuiz onComplete={(payload) => setFormData(prev => ({ ...prev, quiz_score: payload.score, quiz_metrics: payload.metrics, quiz_attempted: true }))} />
+                    ) : (
+                      <div className="p-12 text-center space-y-4 bg-emerald-50 h-[400px] flex flex-col items-center justify-center rounded-3xl border border-emerald-200">
+                        <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-2">
+                          <Activity className="w-10 h-10 text-emerald-600" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-slate-900">Quizzes Completed</h3>
+                        <p className="text-slate-600 max-w-sm">Your cognitive metrics have been recorded. You can proceed to the final step.</p>
+                        <button onClick={() => setFormData(p => ({ ...p, quiz_attempted: false }))} className="text-xs font-bold text-emerald-600 hover:underline mt-4 uppercase tracking-widest">
+                          Retake Quizzes
+                        </button>
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+
+                {step === 5 && (
+                  <motion.div
+                    key="step5"
+                    initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
+                    animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+                    exit={{ opacity: 0, y: -12, filter: 'blur(2px)' }}
+                    transition={stepPanelTransition}
+                    className="space-y-8"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-3 text-fuchsia-600">
+                        <Sparkles className="w-5 h-5" />
+                        <span className="text-xs font-bold uppercase tracking-[0.2em]">Final Phase</span>
+                      </div>
+                      <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Writing Sample</h2>
+                      <p className="text-slate-600 text-sm">Share your thoughts to help the AI analyze your patterns.</p>
+                    </div>
+
+                    <div className="space-y-5">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {speechSupported ? (
+                          <motion.button
+                            type="button"
+                            onClick={handleVoiceToggle}
+                            whileHover={{ scale: 1.03 }}
+                            whileTap={{ scale: 0.96 }}
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all ${
+                              isListening
+                                ? 'bg-rose-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-pulse'
+                                : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-[0_0_25px_rgba(99,102,241,0.4)]'
+                            }`}
+                          >
+                            {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                            {isListening ? 'Stop Recording' : 'Speak to Write'}
+                          </motion.button>
+                        ) : (
+                          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl glass-neural text-slate-500 text-xs font-semibold">
+                            <AlertCircle className="w-3.5 h-3.5" />
+                            Speech not supported in this browser
+                          </div>
+                        )}
+                        {isListening && (
+                          <div className="flex items-center gap-2 px-2">
+                            <motion.span
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="text-[10px] font-bold uppercase tracking-widest text-rose-400"
+                            >
+                              🎙 Listening...
+                            </motion.span>
+                            <LiveAudioWaveform isListening={isListening} />
+                          </div>
+                        )}
+                        {voiceError && (
+                          <span className="text-[10px] font-semibold text-rose-400">{voiceError}</span>
+                        )}
+                      </div>
+
+                      <div className="relative">
+                        <textarea
+                            ref={journalRef}
+                            name="journal_text"
+                            value={formData.journal_text + (isListening && interimText ? interimText : '')}
+                            onChange={handleChange}
+                            placeholder="Type, paste, or speak your journal entry — describe your typical day..."
+                            className={`w-full h-56 glass-input rounded-2xl p-8 text-slate-900 outline-none transition-all resize-none leading-relaxed placeholder:text-slate-500 font-medium ${
+                              isListening ? 'border-rose-500/40 shadow-[0_0_0_3px_rgba(239,68,68,0.1)]' : ''
+                            }`}
+                        />
+                        <div className="absolute bottom-6 right-8 text-[10px] font-bold text-slate-600 uppercase tracking-widest">
+                            {formData.journal_text.length} Characters
+                        </div>
+                      </div>
+
+                      {detectedEmotions.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 4 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="space-y-2"
+                        >
+                          <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-500 ml-1">Emotion Signals Detected</p>
+                          <div className="flex flex-wrap gap-2">
+                            {detectedEmotions.map(emotion => {
+                              const meta = getEmotionMeta(emotion);
+                              if (!meta) return null;
+                              return (
+                                <motion.span
+                                  key={emotion}
+                                  initial={{ scale: 0.8, opacity: 0 }}
+                                  animate={{ scale: 1, opacity: 1 }}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold glass-neural"
+                                  style={{ color: meta.color, borderColor: `${meta.color}33` }}
+                                >
+                                  <span>{meta.emoji}</span>
+                                  {meta.label}
+                                </motion.span>
+                              );
+                            })}
+                            <span className="text-[9px] font-semibold text-slate-600 flex items-center">→ sent to NLP</span>
+                          </div>
                         </motion.div>
                       )}
-                    </AnimatePresence>
-                  </div>
-                </motion.div>
-              )}
-
-              {step === 2 && (
-                <motion.div
-                  key="step2"
-                  initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, y: -12, filter: 'blur(2px)' }}
-                  transition={stepPanelTransition}
-                  className="space-y-8"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 text-cyan-600">
-                      <Activity className="w-5 h-5" />
-                      <span className="text-xs font-bold uppercase tracking-[0.2em]">Step 02</span>
-                    </div>
-                    <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Behavioral Habits</h2>
-                    <p className="text-slate-600 text-sm">How you typically act and react.</p>
-                  </div>
-
-                  <div className="space-y-6">
-                    <SliderGroup label="Focus Difficulty" description="Difficulty staying focused on one thing" name="focus_level" value={formData.focus_level} onChange={handleSliderChange} delay={0.03} step={step} />
-                    <SliderGroup label="Restlessness" description="Feeling the need to move or fidget constantly" name="hyperactivity" value={formData.hyperactivity} onChange={handleSliderChange} delay={0.08} step={step} />
-                    <SliderGroup label="Acting on Impulse" description="Tendency to do things without thinking first" name="impulsiveness" value={formData.impulsiveness} onChange={handleSliderChange} delay={0.13} step={step} />
-                    <SliderGroup label="Attention Span" description="How long you can pay attention to one thing" name="attention_span" value={formData.attention_span} onChange={handleSliderChange} delay={0.18} step={step} />
-                  </div>
-                </motion.div>
-              )}
-
-              {step === 3 && (
-                <motion.div
-                  key="step3"
-                  initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, y: -12, filter: 'blur(2px)' }}
-                  transition={stepPanelTransition}
-                  className="space-y-8"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 text-violet-600">
-                      <Coffee className="w-5 h-5" />
-                      <span className="text-xs font-bold uppercase tracking-[0.2em]">Step 03</span>
-                    </div>
-                    <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Lifestyle & Sleep</h2>
-                    <p className="text-slate-600 text-sm">Your daily routines and environment.</p>
-                  </div>
-
-                  <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-6">
-                      <InputGroup label="Sleep (Hours)" name="sleep_hours" value={formData.sleep_hours} onChange={handleChange} type="number" step="0.5" />
-                      <InputGroup label="Screen Time" name="screen_time" value={formData.screen_time} onChange={handleChange} type="number" step="0.5" />
-                    </div>
-                    <SliderGroup label="Finishing Tasks" description="How often you finish the tasks you start" name="task_completion" value={formData.task_completion} onChange={handleSliderChange} delay={0.03} step={step} />
-                    <SliderGroup label="Stress Level" description="How much stress or pressure you feel daily" name="stress_level" value={formData.stress_level} onChange={handleSliderChange} delay={0.08} step={step} />
-                  </div>
-                </motion.div>
-              )}
-
-              {step === 4 && (
-                <motion.div
-                  key="step4"
-                  initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
-                  animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-                  exit={{ opacity: 0, y: -12, filter: 'blur(2px)' }}
-                  transition={stepPanelTransition}
-                  className="space-y-8"
-                >
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-3 text-fuchsia-600">
-                      <Sparkles className="w-5 h-5" />
-                      <span className="text-xs font-bold uppercase tracking-[0.2em]">Final Phase</span>
-                    </div>
-                    <h2 className="text-3xl font-bold text-slate-900 tracking-tight">Writing Sample</h2>
-                    <p className="text-slate-600 text-sm">Share your thoughts to help the AI analyze your patterns.</p>
-                  </div>
-
-                  <div className="space-y-5">
-
-                    {/* Mic controls */}
-                    <div className="flex items-center gap-3 flex-wrap">
-                      {speechSupported ? (
-                        <motion.button
-                          type="button"
-                          onClick={handleVoiceToggle}
-                          whileHover={{ scale: 1.03 }}
-                          whileTap={{ scale: 0.96 }}
-                          className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl font-bold uppercase tracking-widest text-xs transition-all ${
-                            isListening
-                              ? 'bg-rose-500 text-white shadow-[0_0_20px_rgba(239,68,68,0.4)] animate-pulse'
-                              : 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:shadow-[0_0_25px_rgba(99,102,241,0.4)]'
-                          }`}
-                        >
-                          {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                          {isListening ? 'Stop Recording' : 'Speak to Write'}
-                        </motion.button>
-                      ) : (
-                        <div className="flex items-center gap-2 px-4 py-2 rounded-2xl glass-neural text-slate-500 text-xs font-semibold">
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          Speech not supported in this browser
+                      
+                      <div className="glass-neural p-5 rounded-2xl flex gap-4 border border-slate-200">
+                        <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 h-fit">
+                            <Activity className="w-4 h-4 text-indigo-600" />
                         </div>
-                      )}
-                      {isListening && (
-                        <div className="flex items-center gap-2 px-2">
-                          <motion.span
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            className="text-[10px] font-bold uppercase tracking-widest text-rose-400"
-                          >
-                            🎙 Listening...
-                          </motion.span>
-                          <LiveAudioWaveform isListening={isListening} />
+                        <div>
+                            <p className="text-slate-600 text-xs leading-relaxed">
+                                The GENAI model reads your text <strong className="text-slate-900">and</strong> detected emotion signals to strengthen the attention and stress inference pathways.
+                            </p>
                         </div>
-                      )}
-                      {voiceError && (
-                        <span className="text-[10px] font-semibold text-rose-400">{voiceError}</span>
-                      )}
-                    </div>
-
-                    <div className="relative">
-                      <textarea
-                          ref={journalRef}
-                          name="journal_text"
-                          value={formData.journal_text + (isListening && interimText ? interimText : '')}
-                          onChange={handleChange}
-                          placeholder="Type, paste, or speak your journal entry — describe your typical day..."
-                          className={`w-full h-56 glass-input rounded-2xl p-8 text-slate-900 outline-none transition-all resize-none leading-relaxed placeholder:text-slate-500 font-medium ${
-                            isListening ? 'border-rose-500/40 shadow-[0_0_0_3px_rgba(239,68,68,0.1)]' : ''
-                          }`}
-                      />
-                      <div className="absolute bottom-6 right-8 text-[10px] font-bold text-slate-600 uppercase tracking-widest">
-                          {formData.journal_text.length} Characters
                       </div>
                     </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-                    {/* Emotion badges */}
-                    {detectedEmotions.length > 0 && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 4 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="space-y-2"
-                      >
-                        <p className="text-[9px] font-bold uppercase tracking-[0.25em] text-slate-500 ml-1">Emotion Signals Detected</p>
-                        <div className="flex flex-wrap gap-2">
-                          {detectedEmotions.map(emotion => {
-                            const meta = getEmotionMeta(emotion);
-                            if (!meta) return null;
-                            return (
-                              <motion.span
-                                key={emotion}
-                                initial={{ scale: 0.8, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold glass-neural"
-                                style={{ color: meta.color, borderColor: `${meta.color}33` }}
-                              >
-                                <span>{meta.emoji}</span>
-                                {meta.label}
-                              </motion.span>
-                            );
-                          })}
-                          <span className="text-[9px] font-semibold text-slate-600 flex items-center">→ sent to NLP</span>
-                        </div>
-                      </motion.div>
-                    )}
-                    
-                    <div className="glass-neural p-5 rounded-2xl flex gap-4 border border-slate-200">
-                      <div className="p-3 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 h-fit">
-                          <Activity className="w-4 h-4 text-indigo-600" />
-                      </div>
-                      <div>
-                          <p className="text-slate-600 text-xs leading-relaxed">
-                              The GENAI model reads your text <strong className="text-slate-900">and</strong> detected emotion signals to strengthen the attention and stress inference pathways.
-                          </p>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+              <div className="flex items-center justify-between mt-12 pt-10 border-t border-slate-200">
+                {step > 1 ? (
+                  <button
+                    onClick={prevStep}
+                    className="flex items-center gap-2 text-indigo-400 font-bold uppercase tracking-widest text-xs hover:text-cyan-300 transition-colors"
+                    disabled={loading}
+                  >
+                    <ArrowLeft className="w-4 h-4" /> Back
+                  </button>
+                ) : <div />}
 
-            <div className="flex items-center justify-between mt-12 pt-10 border-t border-slate-200">
-              {step > 1 ? (
-                <button
-                  onClick={prevStep}
-                  className="flex items-center gap-2 text-indigo-400 font-bold uppercase tracking-widest text-xs hover:text-cyan-300 transition-colors"
-                  disabled={loading}
-                >
-                  <ArrowLeft className="w-4 h-4" /> Back
-                </button>
-              ) : <div />}
-
-              {step < 4 ? (
-                <motion.button
-                  onClick={nextStep}
-                  className={`group flex items-center gap-3 bg-gradient-to-r ${colors.gradient} text-white px-10 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-[0_0_30px_rgba(99,102,241,0.25)] hover:shadow-[0_0_45px_rgba(99,102,241,0.4)] transition-all transform active:scale-95`}
-                  whileHover={{ y: -1, scale: 1.01 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  Next Step <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                </motion.button>
-              ) : (
-                <motion.button
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  className={`flex items-center gap-3 bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white px-12 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-[0_0_35px_rgba(217,70,239,0.3)] transition-all transform active:scale-95 ${loading ? 'opacity-50 cursor-wait' : 'hover:shadow-[0_0_50px_rgba(217,70,239,0.5)]'}`}
-                  whileHover={loading ? {} : { y: -1, scale: 1.01 }}
-                  whileTap={loading ? {} : { scale: 0.98 }}
-                >
-                  {loading ? 'Synthesizing...' : <><Save className="w-4 h-4" /> Run Diagnosis</>}
-                </motion.button>
-              )}
+                {step < 5 ? (
+                  <motion.button
+                    onClick={nextStep}
+                    disabled={!canProceed()}
+                    className={`group flex items-center gap-3 bg-gradient-to-r ${colors.gradient} text-white px-10 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-[0_0_30px_rgba(99,102,241,0.25)] transition-all transform ${!canProceed() ? 'opacity-50 cursor-not-allowed grayscale' : 'hover:shadow-[0_0_45px_rgba(99,102,241,0.4)] active:scale-95'}`}
+                    whileHover={canProceed() ? { y: -1, scale: 1.01 } : {}}
+                    whileTap={canProceed() ? { scale: 0.98 } : {}}
+                  >
+                    Next Step <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </motion.button>
+                ) : (
+                  <motion.button
+                    onClick={handleSubmit}
+                    disabled={loading}
+                    className={`flex items-center gap-3 bg-gradient-to-r from-fuchsia-600 to-rose-600 text-white px-12 py-4 rounded-2xl font-bold uppercase tracking-widest text-xs shadow-[0_0_35px_rgba(217,70,239,0.3)] transition-all transform active:scale-95 ${loading ? 'opacity-50 cursor-wait' : 'hover:shadow-[0_0_50px_rgba(217,70,239,0.5)]'}`}
+                    whileHover={loading ? {} : { y: -1, scale: 1.01 }}
+                    whileTap={loading ? {} : { scale: 0.98 }}
+                  >
+                    {loading ? 'Synthesizing...' : <><Save className="w-4 h-4" /> Run Diagnosis</>}
+                  </motion.button>
+                )}
+              </div>
             </div>
-          </div>
-        </motion.div>
+          </motion.div>
 
-        {step >= 2 && (
-          <div className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-8">
-            <CameraTracker onTelemetryUpdate={setWebcamTelemetry} />
-          </div>
-        )}
-      </div>
-    </motion.div>
+          {step >= 2 && step <= 4 && (
+            <div className="w-full lg:w-[380px] shrink-0 lg:sticky lg:top-8">
+              <CameraTracker onTelemetryUpdate={setWebcamTelemetry} />
+            </div>
+          )}
+        </div>
+      </motion.div>
     </div>
   );
 };
 
 /* ─────────────────────────────────────────────
-   Reusable Form Components — Light Theme
+   Reusable Form Components
    ───────────────────────────────────────────── */
 const InputGroup = ({ label, ...props }) => (
   <div className="space-y-2">
@@ -634,161 +693,49 @@ const SelectGroup = ({ label, options, ...props }) => (
   </div>
 );
 
-const SliderGroup = ({ label, description, name, value, onChange, delay = 0, step: currentStep }) => {
-  const colors = stepColors[currentStep] || stepColors[1];
-  const accentHexMap = { indigo: '#4f46e5', cyan: '#0284c7', violet: '#7c3aed', fuchsia: '#c026d3' };
-  const accentColor = accentHexMap[colors.accent] || '#12a4ff';
+/* ─────────────────────────────────────────────
+   Question Card (replaces Slider)
+   ───────────────────────────────────────────── */
+const QuestionCard = ({ question, value, onChange, accent = "indigo" }) => {
+  const options = [
+    { value: 0, label: "Never" },
+    { value: 1, label: "Rarely" },
+    { value: 2, label: "Sometimes" },
+    { value: 3, label: "Often" },
+    { value: 4, label: "Very Often" }
+  ];
 
-  const min = 0;
-  const max = 10;
-  const thumbW = 64;
-
-  const containerRef = useRef(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [pos, setPos] = useState(value || min);
-
-  useEffect(() => {
-    if (!isDragging) setPos(value || min);
-  }, [value, isDragging, min]);
-
-  const valueFromEvent = useCallback((e) => {
-    if (!containerRef.current) return pos;
-    const r = containerRef.current.getBoundingClientRect();
-    const x = e.clientX - r.left - (thumbW / 2);
-    const span = containerRef.current.clientWidth - thumbW;
-    if (span <= 0) return min;
-    const t = Math.min(1, Math.max(0, x / span));
-    return min + t * (max - min);
-  }, [min, max, pos]);
-
-  const handlePointerDown = (e) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setIsDragging(true);
-    setPos(valueFromEvent(e));
+  const activeColorMap = {
+    indigo: "bg-indigo-600 text-white shadow-[0_4px_15px_rgba(79,70,229,0.3)]",
+    cyan: "bg-cyan-600 text-white shadow-[0_4px_15px_rgba(2,132,199,0.3)]",
+    violet: "bg-violet-600 text-white shadow-[0_4px_15px_rgba(124,58,237,0.3)]"
   };
-
-  const handlePointerMove = (e) => {
-    if (!isDragging) return;
-    setPos(valueFromEvent(e));
-  };
-
-  const handlePointerUp = (e) => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    const snapped = Math.max(min, Math.min(max, Math.round(pos)));
-    onChange(name, snapped);
-    setPos(snapped);
-  };
-
-  const handleKeyDown = (e) => {
-    let stepAmount = 0;
-    if (e.key === 'ArrowRight' || e.key === 'ArrowUp') stepAmount = 1;
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') stepAmount = -1;
-    if (stepAmount !== 0) {
-      e.preventDefault();
-      const snapped = Math.max(min, Math.min(max, Math.round((value || min) + stepAmount)));
-      onChange(name, snapped);
-    }
-    if (e.key === 'Home') onChange(name, min);
-    if (e.key === 'End') onChange(name, max);
-  };
-
-  const percent = Math.max(0, Math.min(1, (pos - min) / (max - min)));
-  const thumbLeft = `calc(${percent * 100}% - ${percent * thumbW}px)`;
-  const centerPos = `calc(${percent * 100}% - ${percent * thumbW}px + ${thumbW / 2}px)`;
-
-  const dots = [];
-  for (let i = min; i <= max; i++) dots.push(i);
+  const activeColor = activeColorMap[accent];
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 10 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, delay, ease: 'easeOut' }}
-      className="space-y-4 rounded-2xl glass-neural p-5 hover:border-indigo-400/40 transition-all border border-slate-200 bg-white/80"
-    >
-      <div className="flex justify-between items-end px-1">
-        <div className="space-y-1">
-          <h4 className="font-bold text-slate-900 text-lg tracking-tight">{label}</h4>
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest">{description}</p>
-        </div>
-        <motion.div
-          key={`${name}-${value}`}
-          initial={{ scale: 0.86, opacity: 0.55 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.22 }}
-          className="text-slate-900 font-bold text-xl tabular-nums flex items-center gap-1"
-        >
-          {Math.round(value || min)} <span className="text-slate-400 text-sm font-medium">/ 10</span>
-        </motion.div>
+    <div className="glass-neural rounded-2xl p-6 border border-slate-200 transition-all hover:border-slate-300 bg-white/80">
+      <p className="font-bold text-slate-800 text-[15px] mb-5 leading-relaxed">
+        {question.text}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {options.map((opt) => {
+          const isSelected = value === opt.value;
+          return (
+            <button
+              key={opt.value}
+              onClick={() => onChange(opt.value)}
+              className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all transform active:scale-95 ${
+                isSelected 
+                  ? activeColor 
+                  : "bg-slate-100 text-slate-500 hover:bg-slate-200"
+              }`}
+            >
+              {opt.label}
+            </button>
+          )
+        })}
       </div>
-
-      <div 
-        className="relative w-full h-[80px] touch-none select-none cursor-pointer outline-none group mt-2"
-        tabIndex={0}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onKeyDown={handleKeyDown}
-        ref={containerRef}
-        style={{
-          '--accent': accentColor,
-          '--track': '#d9d9d9',
-          '--dot-off': '#cfcfcf',
-          '--thumb-w': '64px',
-          '--thumb-h': '40px'
-        }}
-      >
-        <div className="absolute left-0 right-0 top-[28px] h-[8px] rounded-full bg-[var(--track)]">
-            <div 
-              className="absolute left-0 top-0 bottom-0 rounded-full" 
-              style={{ 
-                width: centerPos, 
-                backgroundColor: 'var(--accent)',
-                transition: isDragging ? 'none' : 'width 0.22s cubic-bezier(0.3, 1.2, 0.5, 1)' 
-              }}
-            />
-        </div>
-
-        <div className="absolute left-0 right-0 top-[46px] h-[6px]">
-            {dots.map(d => {
-                const dPercent = (d - min) / (max - min);
-                const isActive = d <= Math.round(pos);
-                return (
-                    <div 
-                      key={d}
-                      className="absolute w-[5px] h-[5px] rounded-full transition-colors duration-200"
-                      style={{
-                          left: `calc(32px + ${dPercent * 100}% - ${dPercent * 64}px)`,
-                          transform: 'translateX(-50%)',
-                          backgroundColor: isActive ? 'var(--accent)' : 'var(--dot-off)'
-                      }}
-                    />
-                );
-            })}
-        </div>
-
-        <div 
-          className="absolute top-[12px] rounded-full border border-white/90 will-change-[left] group-focus-visible:outline group-focus-visible:outline-2 group-focus-visible:outline-[var(--accent)] group-focus-visible:outline-offset-[3px]"
-          style={{
-              width: 'var(--thumb-w)',
-              height: 'var(--thumb-h)',
-              left: thumbLeft,
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.85) 0%, rgba(255,255,255,0.35) 45%, rgba(255,255,255,0.55) 100%)',
-              backdropFilter: 'blur(1.5px) saturate(1.4) brightness(1.12)',
-              WebkitBackdropFilter: 'blur(1.5px) saturate(1.4) brightness(1.12)',
-              boxShadow: isDragging 
-                  ? '0 10px 22px rgba(0,0,0,0.18), 0 1px 3px rgba(0,0,0,0.2), inset 0 1px 2px #fff, inset 0 -3px 6px rgba(0,0,0,0.06)'
-                  : '0 6px 14px rgba(0,0,0,0.14), 0 1px 3px rgba(0,0,0,0.18), inset 0 1px 2px rgba(255,255,255,0.95), inset 0 -3px 6px rgba(0,0,0,0.06)',
-              transform: isDragging ? 'scale(1.08)' : 'scale(1)',
-              transition: isDragging 
-                  ? 'transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.18s'
-                  : 'left 0.22s cubic-bezier(0.3, 1.2, 0.5, 1), transform 0.18s cubic-bezier(0.3, 1.4, 0.5, 1), box-shadow 0.18s, width 0.22s cubic-bezier(0.3, 1.2, 0.5, 1)'
-          }}
-        />
-      </div>
-    </motion.div>
+    </div>
   );
 };
 
@@ -826,9 +773,7 @@ const LiveAudioWaveform = ({ isListening }) => {
           
           for(let i = 0; i < bufferLength; i++) {
             const barHeight = (dataArray[i] / 255) * canvas.height;
-            // Rose-500 color matching the UI
             ctx.fillStyle = `rgb(244, 63, 94)`;
-            // Draw pill shaped rounded bars
             ctx.beginPath();
             ctx.roundRect(x, canvas.height - barHeight - 2, barWidth - 1, barHeight + 4, [4]);
             ctx.fill();
