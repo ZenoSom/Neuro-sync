@@ -121,7 +121,7 @@ class CopilotBriefInput(BaseModel):
     prediction: str
     severity: str
     confidence: float = Field(..., ge=0.0, le=1.0)
-    behavioral_scores: Dict[str, float] = Field(default_factory=dict)
+    behavioral_scores: Dict[str, Any] = Field(default_factory=dict)
     analysis_details: Dict[str, Any] = Field(default_factory=dict)
 
 
